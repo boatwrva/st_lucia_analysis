@@ -1,0 +1,263 @@
+% script for concatenating and processing u/v velocities from SLE stations 
+
+% data_dir = /change this to kerstin's harddrive ; 
+data_dir = '/home/vboatwright/OneDrive/Documents/SIO/projects/santalucia/data/processed_ladcp/station1/'; 
+out_dir = '/home/vboatwright/OneDrive/Documents/SIO/projects/santalucia/data/processed_ladcp/';
+
+cast = 1; 
+file = sprintf('%02d.mat',cast);
+fn = [data_dir file]; 
+S = load(fn); 
+
+% load variables
+u_cast = S.dr.u; 
+v_cast = S.dr.v; 
+
+lon_cast = S.dr.lon; 
+lat_cast = S.dr.lat; 
+
+p_cast = S.dr.p; 
+
+% check the uv ctd 
+u_ctd = S.dr.uctd; 
+v_ctd = S.dr.vctd; 
+w_ctd = S.dr.wctd; 
+
+% for Thorpe scales
+t_ctd = S.dr.ctd_t;
+s_ctd = S.dr.ctd_s;
+
+
+
+%% process and concatenate 
+
+% for station 1: 18 casts 
+casts = 1:18; 
+numcasts = length(casts);
+
+% preallocate based on cast 1 
+
+zlevels = 559; 
+
+u_all = nan(numcasts,zlevels); 
+v_all = nan(numcasts,zlevels); 
+p_all = nan(numcasts,zlevels); 
+
+t_all = nan(numcasts,zlevels); 
+s_all = nan(numcasts,zlevels); 
+
+ctdlevs = 838; 
+u_ctd = nan(numcasts,ctdlevs); 
+v_ctd = nan(numcasts,ctdlevs); 
+w_ctd = nan(numcasts,ctdlevs); 
+
+lon = []; 
+lat = []; 
+time = []; 
+% or concatenate 
+
+u = u_cast; 
+v = v_cast; 
+
+for cc = casts
+
+    file = sprintf('%02d.mat',cc);
+    disp(file)
+    fn = [data_dir file]; 
+    S = load(fn); 
+    
+    % load variables
+    u_cast = S.dr.u; 
+    v_cast = S.dr.v; 
+    
+    lon_cast = S.dr.lon; 
+    lat_cast = S.dr.lat; 
+    
+    p_cast = S.dr.p; 
+    time_cast = datetime(S.dr.date); 
+     
+    disp(length(p_cast))
+    
+    % check the uv ctd 
+    u_ctd_cast = S.dr.uctd; 
+    v_ctd_cast = S.dr.vctd; 
+    w_ctd_cast = S.dr.wctd; 
+    
+    disp(length(u_ctd_cast))
+
+    % for Thorpe scales
+    t_ctd = S.dr.ctd_t;
+    s_ctd = S.dr.ctd_s;
+
+    % concatenate 
+
+    lon = cat(1,lon,lon_cast); 
+    lat = cat(1,lat,lat_cast);
+    time = cat(1,time,time_cast);
+
+    u_all(cc,1:length(p_cast)) = u_cast; 
+    v_all(cc,1:length(p_cast)) = v_cast; 
+    p_all(cc,1:length(p_cast)) = p_cast; 
+    
+    t_all(cc,1:length(p_cast)) = t_ctd; 
+    s_all(cc,1:length(p_cast)) = s_ctd; 
+    
+    u_ctd(cc,1:length(u_ctd_cast)) = u_ctd_cast; 
+    v_ctd(cc,1:length(u_ctd_cast)) = u_ctd_cast;
+    w_ctd(cc,1:length(u_ctd_cast)) = u_ctd_cast;
+
+
+
+end
+
+%% now plot 
+
+cast_dim = repmat(casts,zlevels,1)'; 
+time_dim = repmat(time,1,zlevels); 
+
+figure()
+subplot(2,1,1); hold on 
+title('u velocity')
+pcolor(time_dim,p_all,u_all); 
+shading flat 
+xlabel('Time'); ylabel('Depth [dbar]')
+xtickformat('dd HH:mm')
+set(gca, 'YDir', 'reverse')
+cb = colorbar;
+ylabel(cb,'u [m/s]','Rotation',270)
+clim([-0.2 0.2])
+
+subplot(2,1,2); hold on 
+title('v velocity')
+pcolor(time_dim,p_all,v_all); 
+shading flat 
+xlabel('Date'); ylabel('Depth [dbar]')
+xtickformat('MM-dd HH:mm')
+set(gca, 'YDir', 'reverse')
+cb = colorbar;
+ylabel(cb,'v [m/s]','Rotation',270)
+clim([-0.2 0.2])
+
+
+%% calculate shear 
+
+[nc,nz] = size(u_all);
+shear_u = nan(nc,nz);
+shear_v = nan(nc,nz);
+
+disp(size(shear_u))
+for cc = casts 
+    % need to do individually for each column because they each start at a different point due to NaNs
+    
+    for ii = 1:nz-1
+        % going from the top to bottom  
+        
+        if isnan(u_all(cc,ii+1)) == 0
+            % do shear calculations only if the level below has a value 
+            shear_u(cc,ii) = (u_all(cc,ii+1)-u_all(cc,ii)) / (p_all(cc,ii+1) - p_all(cc,ii)); 
+            shear_v(cc,ii) = (v_all(cc,ii+1)-v_all(cc,ii)) / (p_all(cc,ii+1) - p_all(cc,ii));
+
+        end 
+    end
+end
+
+
+%% now plot shear
+
+figure()
+subplot(2,1,1); hold on 
+title('u shear')
+pcolor(cast_dim,p_all,shear_u); 
+shading flat 
+xlabel('Cast #'); ylabel('Depth [dbar]')
+set(gca, 'YDir', 'reverse')
+cb = colorbar;
+ylabel(cb,'du/dz [1/s]','Rotation',270)
+clim([-0.0125 0.0125])
+
+subplot(2,1,2); hold on 
+title('v shear')
+pcolor(cast_dim,p_all,shear_v); 
+shading flat 
+xlabel('Cast #'); ylabel('Depth [dbar]')
+set(gca, 'YDir', 'reverse')
+cb = colorbar;
+ylabel(cb,'dv/dz [1/s]','Rotation',270)
+clim([-0.0125 0.0125])
+
+
+%% 
+
+
+
+%% 
+
+casts = 1:12; 
+numcasts = length(casts);
+stations = [1,5,9,11,7,2,6,10,12,8,4,3]; 
+deepest = 1200; 
+u_velocity = nan(12,deepest); 
+v_velocity = nan(12,deepest); 
+z_depth = nan(12,deepest); 
+
+figure(1); hold on 
+ii = 0;
+for icast=2:13
+    ii = ii + 1; 
+    file = sprintf('%03d.mat',icast);
+    fn = [dir_ladcp file]; 
+    S = load(fn);
+    data = S.dr; 
+    zlevs = length(data.z);
+    u_velocity(ii,1:zlevs) = data.u; 
+    v_velocity(ii,1:zlevs) = data.v; 
+    z_depth(ii,1:zlevs) = data.z; 
+
+    subplot(3,4,ii); hold on 
+    x = zeros(zlevs,1);
+    y = zeros(zlevs,1);
+    w = zeros(zlevs,1); 
+
+    title(sprintf('Station %d',stations(icast-1)))
+    quiver3(x,y,data.z,data.u,data.v,w,0)
+    zlabel('Depth [m]'); set(gca, 'ZDir', 'reverse');
+    xlabel('Velocity [m/s]')
+
+end
+
+
+%% save all casts 
+
+ladcp_casts = struct; 
+ladcp_casts.u_vel = u_velocity; 
+ladcp_casts.v_vel = v_velocity; 
+ladcp_casts.z = z_depth; 
+ladcp_casts.stations = stations;
+
+%% organize by location in grid 
+
+castnumbers = [1:13]; 
+stationnumbers = [0,1,5,9,11,7,2,6,10,12,8,4,3]; 
+% going from 1 at northwest ---> 4 at northeast; 5 at middle west ---> ; 12 at southeast 
+cardinallocs = [0,9,5,1,3,7,10,6,2,4,8,12,11]; 
+stationlocs = cardinallocs(2:end);
+
+% plot with u,v both showing (not 3D) 
+figure(); hold on; set(gcf,'Color','White') 
+ii = 0;
+for icast=1:12
+    subplot(3,4,stationlocs(icast)); hold on 
+    title(sprintf('Station %d',stations(icast)))
+    
+    pu = plot(u_velocity(icast,:),z_depth(icast,:),'Color','#A2142F','DisplayName','u'); hold on 
+    pv = plot(v_velocity(icast,:),z_depth(icast,:),'Color','#0072BD','DisplayName','v'); hold on 
+    xline(0,'Color','Red','LineStyle','--','DisplayName','Zero')
+    % z in depth (0 is surface) 
+    xlabel('Velocity [m/s]')
+    ylabel('Depth [m]'); set(gca,'YDir','reverse')
+    legend()
+
+end
+
+
+   
