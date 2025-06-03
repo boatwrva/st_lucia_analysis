@@ -345,14 +345,14 @@ amp_err2 = amp_err;
 
 color1p = 'cyan'; color1n = 'blue'; 
 color2p = 'red'; color2n = 'magenta'; 
-fig = figure(3);clf; 
-loglog(m1,amp1,'DisplayName','1+','LineWidth',3,'Color',color1p); hold on 
-loglog(-m1,amp1,'DisplayName','1-','LineWidth',3,'Color',color1n); hold on
-fill(m1,amp1+amp_err1.upper, amp1-amp_err1.lower,'DisplayName','uncertain error bars','FaceColor','green')
+figure(3);clf; 
+loglog(m1,amp1,'DisplayName','positive','LineWidth',3,'Color',color1p); hold on 
+loglog(-m1,amp1,'DisplayName','negative','LineWidth',3,'Color',color1n); hold on
+fill(m,amp_all+amp_err.upper, amp_all-amp_err.lower,'DisplayName','uncertain error bars','FaceColor','green')
 
-loglog(m2,amp2,'DisplayName','2+','LineWidth',3,'Color',color2p); hold on 
-loglog(-m2,amp2,'DisplayName','2-','LineWidth',3,'Color',color2n); hold on
-fill(m2,amp2+amp_err2.upper, amp2-amp_err2.lower,'DisplayName','uncertain error bars','FaceColor','yellow')
+loglog(m,amp_all,'DisplayName','positive','LineWidth',3,'Color',color1p); hold on 
+loglog(-m,amp_all,'DisplayName','negative','LineWidth',3,'Color',color1n); hold on
+fill(m,amp_all+amp_err.upper, amp_all-amp_err.lower,'DisplayName','uncertain error bars','FaceColor','green')
 
 xline(1/100,'LineStyle','--','Color','k','DisplayName','m=1/100m')
 xline(1/300,'LineStyle','--','Color','k','DisplayName','m=1/300m')
@@ -361,5 +361,4 @@ legend()
 ylabel('(m/s)^2/cpm')
 xlabel('cpm')
 
-saveas(fig,sprintf('%s/wavenumber_spectra_firstpass_stats12.png',figure_dir))
 

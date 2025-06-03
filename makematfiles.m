@@ -6,6 +6,7 @@ out_dir = '/home/vboatwright/OneDrive/Documents/SIO/projects/santalucia/data/pro
 
 station = 2; 
 
+
 ladcp_dir = [data_dir 'ladcp/station' num2str(station) '/']; 
 
 
