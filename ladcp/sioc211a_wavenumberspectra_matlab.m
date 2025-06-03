@@ -88,12 +88,15 @@ dk=1./m./dz;
 % make frequencies and wavenumbers that run from -Nyquist to + Nyquist
 f=[-fliplr(1:(n/2)) 0 (1:(n/2-1))].*df;
 k=[-fliplr(1:(m/2)) 0 (1:(m/2-1))].'.*dk;
+
 % Fourier transform in two dimensions
 % here we use fft2 for the 2-d Fourier transform
 % and fftshift to reorder the Fourier transform
 st=fftshift(fft2(data))/m/n;
+
 % turn this into a spectrum
 spec=st.*conj(st)./df./dk; %UNITS: (m/s)^2/cpd/cpm
+
 % and plot
 figure(3)
 imagesc(f,k,log10(spec)); axis xy
@@ -101,9 +104,9 @@ colormap(jet)
 shg
 xlabel('\omega / cpd')
 ylabel('m / cpm')
+
 % this plots the full 2-d plane
-% But you might want a half plane. In that case, you should
-% scale by a factor of 2:
+% But you might want a half plane. In that case, you should scale by a factor of 2:
 figure(4)
 spec=2*spec(:,101:200);
 imagesc(f(101:200),k,log10(spec)); axis xy
@@ -244,4 +247,3 @@ grid()
 legend('positive','negative')
 ylabel('(m/s)^2/cpd')
 xlabel('cpd')
-
