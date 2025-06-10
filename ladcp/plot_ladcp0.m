@@ -17,9 +17,47 @@ time = LADCP1.time;
 
 time_dim = repmat(time,1,nz); 
 
+fig1 = figure();
+set(gcf, 'Color', 'w', 'Position', [100, 100, 900, 600]); % white background + larger size
+clims = [-0.25, 0.25];
+
+% u velocity 
+subplot(2,1,1); hold on
+pcolor(time_dim, p, u); shading flat
+colormap(cmocean('balance')); 
+cb1 = colorbar;
+ylabel(cb1, '[m/s]', 'Rotation', 270, 'FontSize', 11)
+xlabel(''); 
+ylabel('\bfDepth\rm [dbar]', 'FontSize', 12)
+title({'\bfSLE Station 1', 'u velocity'}, 'FontSize', 13)
+set(gca, 'YDir', 'reverse', 'FontSize', 11, 'LineWidth', 1)
+xtickformat('MM-dd HH:mm')
+caxis(clims)
+
+% v velocity 
+subplot(2,1,2); hold on
+pcolor(time_dim, p, v); shading flat
+colormap(cmocean('balance')); 
+cb2 = colorbar;
+ylabel(cb2, '[m/s]', 'Rotation', 270, 'FontSize', 11)
+xlabel('\bfDate\rm', 'FontSize', 12)
+ylabel('\bfDepth\rm [dbar]', 'FontSize', 12)
+title('v velocity', 'FontSize', 13)
+set(gca, 'YDir', 'reverse', 'FontSize', 11, 'LineWidth', 1)
+xtickformat('MM-dd HH:mm')
+caxis(clims)
+
+% can link axes for consistent zoom/pan
+linkaxes(findall(gcf, 'Type', 'axes'), 'x')
+
+
+saveas(fig1,sprintf('%s/postation1_ladcp_uv.png',figure_dir),'png')
+
+
+
 fig1 = figure(); set(gcf,'Color','white')
 subplot(2,1,1); hold on 
-[t,s] = title('Station 1','u velocity');
+[t,s] = title('SLE Station 1','u velocity');
 pcolor(time_dim,p,u); shading flat
 cmocean('balance'); cb = colorbar;
 ylabel(cb,'u [m/s]','Rotation',270)
@@ -39,7 +77,6 @@ cmocean('balance'); cb = colorbar;
 ylabel(cb,'v [m/s]','Rotation',270)
 clim([-0.25 0.25])
 
-saveas(fig1,sprintf('%s/postation1_ladcp_uv.png',figure_dir),'png')
 
 %% shear 
 
@@ -104,6 +141,43 @@ time = LADCP2.time;
 
 time_dim = repmat(time,1,nz); 
 
+fig1 = figure();
+set(gcf, 'Color', 'w', 'Position', [100, 100, 900, 600]); % white background + larger size
+clims = [-0.25, 0.25];
+
+% u velocity 
+subplot(2,1,1); hold on
+pcolor(time_dim, p, u); shading flat
+colormap(cmocean('balance')); 
+cb1 = colorbar;
+ylabel(cb1, '[m/s]', 'Rotation', 270, 'FontSize', 11)
+xlabel(''); 
+ylabel('\bfDepth\rm [dbar]', 'FontSize', 12)
+title({'\bfSLE Station 2', 'u velocity'}, 'FontSize', 13)
+set(gca, 'YDir', 'reverse', 'FontSize', 11, 'LineWidth', 1)
+xtickformat('MM-dd HH:mm')
+caxis(clims)
+
+% v velocity 
+subplot(2,1,2); hold on
+pcolor(time_dim, p, v); shading flat
+colormap(cmocean('balance')); 
+cb2 = colorbar;
+ylabel(cb2, '[m/s]', 'Rotation', 270, 'FontSize', 11)
+xlabel('\bfDate\rm', 'FontSize', 12)
+ylabel('\bfDepth\rm [dbar]', 'FontSize', 12)
+title('v velocity', 'FontSize', 13)
+set(gca, 'YDir', 'reverse', 'FontSize', 11, 'LineWidth', 1)
+xtickformat('MM-dd HH:mm')
+caxis(clims)
+
+% can link axes for consistent zoom/pan
+linkaxes(findall(gcf, 'Type', 'axes'), 'x')
+
+
+saveas(fig1,sprintf('%s/postation2_ladcp_uv.png',figure_dir),'png')
+
+
 fig2 = figure(); set(gcf,'Color','white')
 subplot(2,1,1); hold on 
 [t,s] = title('Station 2','u velocity');
@@ -126,7 +200,6 @@ cmocean('balance'); cb = colorbar;
 ylabel(cb,'v [m/s]','Rotation',270)
 clim([-0.25 0.25])
 
-saveas(fig2,sprintf('%s/postation2_ladcp_uv.png',figure_dir),'png')
 
 %% shear again 
 
@@ -175,4 +248,8 @@ clim([-0.01 0.01])
 
 
 saveas(fig2,sprintf('%s/postation2_ladcp_uv_shear.png',figure_dir),'png')
+
+
+
+%% least squares for harmonic 
 

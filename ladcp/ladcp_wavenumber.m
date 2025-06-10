@@ -1,14 +1,19 @@
 %% SLE Wavenumber analysis 
 
+set(0, 'DefaultAxesFontSize', 12);      % axes tick labels
+set(0, 'DefaultTextFontSize', 12);      % xlabel, ylabel, title, legend, etc.
+
+
 data_dir = '/home/vboatwright/OneDrive/Documents/SIO/projects/santalucia/data/processed_ship/'; 
 fn = 'LADCP_station1.mat'; 
 
 file = [data_dir fn]; 
 load(file) 
 
+
 %%
 analysis_dir = '/home/vboatwright/OneDrive/Documents/SIO/projects/santalucia/st_lucia_analysis';
-addpath analysis_dir 
+addpath(analysis_dir) 
 
 [nt,nz] = size(LADCP1.u);
 u = LADCP1.u; v = LADCP1.v; p = LADCP1.p; 
@@ -25,7 +30,7 @@ ylabel('depth [m]')
 
 
 
-
+windowing = 1
 %% make rotary spectra 
 
 rotary = nan(nt,nz); 
@@ -33,7 +38,7 @@ column_length = [];
 % make complex vector for each segment - ignore missing vals at bottom
 for it = 1:nt
     iz = find(~isnan(u(it,:)));
-    complex = u(it,iz)+i*v(it,iz); 
+    complex = u(it,iz)+1i*v(it,iz); 
     rotary(it,iz) = complex; 
     column_length = cat(1,column_length,length(iz));
     disp(column_length)
@@ -59,7 +64,7 @@ disp(sprintf('record length is %s long.',max(dates)-min(dates)))
 
 dz = nanmean(diff(p,1,2),'all'); 
 nz = min_depth;
-depths = p(1:min_depth);
+depths = p(:,1:min_depth);
 M = dz*min_depth; 
 fundamentalm = 1/M; 
 nym = 1/2/dz; 
@@ -70,106 +75,131 @@ disp(sprintf('record length is %d deep/long.',M))
 % Check it for nans!
 disp(['The record has ' num2str(length(find(isnan(data)))) ' NaNs.'])
 
-pidx = 247; % index for depth of 997m
-figure(1)
-title('plotting at 1 depth: ~1000m')
-plot(dates,real(data(:,pidx))); hold on
-plot(dates,imag(data(:,pidx)))
-ylabel('velocity [m/s]')
-xlabel('Time')
-legend('u','v')
-datetick
+% pidx = 247; % index for depth of 997m
+% figure(2)
+% title('plotting at 1 depth: ~1000m')
+% plot(dates,real(data(:,pidx))); hold on
+% plot(dates,imag(data(:,pidx)))
+% ylabel('velocity [m/s]')
+% xlabel('Time')
+% legend('u','v')
+% datetick
 
-castnum = 1;
-figure(2)
+
+figure(3); clf;
 title('plotting first cast')
-subplot(1,2,1); hold on 
-plot(real(data(castnum,:)),depths(castnum,:)); hold on
-plot(imag(data(castnum,:)),depths(castnum,:))
-set(gca,'YDir','reverse')
-ylabel('depth [m]')
-xlabel('velocity [m/s]')
-legend('u','v')
-xlim([-0.25,0.25])
-subplot(1,2,2); hold on 
-scatter(u(castnum,1:min_depth),depths(castnum,:)); hold on
-scatter(v(castnum,1:min_depth ),depths(castnum,:))
-set(gca,'YDir','reverse')
-ylabel('depth [m]')
-xlabel('velocity [m/s]')
-legend('u','v')
-xlim([-0.25,0.25])
-
+for castnum = 1 
+    subplot(1,2,1); hold on 
+    plot(real(data(castnum,:)),depths(castnum,:)); hold on
+    plot(imag(data(castnum,:)),depths(castnum,:))
+    set(gca,'YDir','reverse')
+    ylabel('depth [m]')
+    xlabel('velocity [m/s]')
+    legend('u','v')
+    xlim([-0.25,0.25])
+    subplot(1,2,2); hold on 
+    scatter(u(castnum,1:min_depth),depths(castnum,:)); hold on
+    scatter(v(castnum,1:min_depth ),depths(castnum,:))
+    set(gca,'YDir','reverse')
+    ylabel('depth [m]')
+    xlabel('velocity [m/s]')
+    legend('u','v')
+    xlim([-0.25,0.25])
+end
 
 
 %% Now we compute the rotary spectrum per cast .
 
-windowing = 1; 
 windows = nt; datapoints = nz;
 
-if windowing==1 %detrend and demean
-    datab = detrend(data);
+all_spectra = nan(nt,nz); 
+
+for cast = 1:nt 
+    
+    if windowing==0 % just detrend and demean
+        datab = detrend(data(cast,:));
+    end
+    
+    if windowing==1 % detrend and apply a Hanning window
+        w = hann(datapoints);
+        w = w/sqrt(mean(w.^2));
+        datab = detrend(data(cast,:));
+        datab = datab.*w';
+    end
+    
+    b=fft(datab); % computes the fft for each cast
+    b=fftshift(b); % use fftshift to rearrange to have 0 wavenumber in the center
+    
+    % you should have to make some changes for odd N 
+    %if rem(datapoints,2)==0
+    %amp_b=abs(b(:,1:datapoints/2+1)).^2; % even N
+    %else 
+    %amp_b=abs(b(:,1:(datapoints+1)/2).^2); %  odd N
+    %end
+    
+    % square for spectrum
+    amp_b = abs(b(:,1:datapoints).^2); 
+    % normalize amp
+    amp_b = amp_b / datapoints.^2;  % correct for the MATLAB normalization
+    % amp_b = amp_b .* 2;           % keeping the whole spectrum so do not want to multiply
+    amp_b = amp_b / fundamentalm;   % definition of the spectrum
+    amp_all = mean(amp_b,1);  % average for all segemnts 
+    
+    %error bars
+    nu=2*windows;
+    amp_err.upper = amp_all*nu/chi2inv(0.05/2,nu);     %upper
+    amp_err.lower = amp_all*nu/chi2inv(1-0.05/2,nu);   %lower 
+    
+    % Check whether it gives the variance to satisfy parsevals (for each individual window this must hold)     
+    
+    variance = nanmean(abs(datab).^2);
+    sum_spec = sum(amp_b)*fundamentalm;
+    parsevals = sum_spec/variance;
+    if round(parsevals) ~= 1
+        disp('bad parsevals!')
+        parsevals
+    end
+    
+    % rotary wavenumber goes from negative fm to positive fm:
+    m=-datapoints/2*fundamentalm:fundamentalm:datapoints/2*fundamentalm-fundamentalm;
+     
+    % color1p = 'cyan'; color1n = 'blue'; 
+    % figure();clf; 
+    % loglog(m,amp_b(:,:),-m,amp_b(:,:),'LineWidth',1); hold on 
+    % loglog(m,amp_all,'DisplayName','positive','LineWidth',3,'Color',color1p); hold on 
+    % loglog(-m,amp_all,'DisplayName','negative','LineWidth',3,'Color',color1n); hold on
+    % fill(m,amp_all+amp_err.upper, amp_all-amp_err.lower,'DisplayName','uncertain error bars','FaceColor','green')
+    % 
+    % xline(1/100,'LineStyle','--','Color','k','DisplayName','m=1/100m')
+    % xline(1/300,'LineStyle','--','Color','k','DisplayName','m=1/300m')
+    % 
+    % ylabel('(m/s)^2/cpm')
+    % xlabel('cpm')
+    % 
+    
+    all_spectra(cast,:) = amp_b; 
+
 end
 
-if windowing==2 %detrend and apply a Hanning window
-    w = hann(datapoints);
-    w = w/sqrt(mean(w.^2));
-    datab = detrend(data);
-    datab = datab.*w;
-end
+%% take their average 
 
-b=fft(datab); % computes the fft for each cast
-b=fftshift(b); % use fftshift to rearrange to have 0 wavenumber in the center
-
-% you should have to make some changes for odd N 
-%if rem(datapoints,2)==0
-%amp_b=abs(b(:,1:datapoints/2+1)).^2; % even N
-%else 
-%amp_b=abs(b(:,1:(datapoints+1)/2).^2); %  odd N
-%end
-
-% square for spectrum
-amp_b = abs(b(:,1:datapoints).^2); 
-% normalize amp
-amp_b = amp_b / datapoints.^2;  % correct for the MATLAB normalization
-% amp_b = amp_b .* 2;           % keeping the whole spectrum so do not want to multiply
-amp_b = amp_b / fundamentalm;   % definition of the spectrum
-amp_all = mean(amp_b,1);  % average for all segemnts 
-
-%error bars
-nu=2*windows;
-amp_err.upper = amp_all*nu/chi2inv(0.05/2,nu);     %upper
-amp_err.lower = amp_all*nu/chi2inv(1-0.05/2,nu);   %lower 
-
-%Check whether it gives the variance to satisfy parsevals
-variance = nanmean(abs(datab).^2,'all')
-sum_spec = sum(amp_all)*fundamentalm
-parsevals = sum_spec/variance
-
-
-% rotary wavenumber goes from negative fm to positive fm:
-m=-datapoints/2*fundamentalm:fundamentalm:datapoints/2*fundamentalm-fundamentalm;
-
-%%
-
+mean_spectra1 = mean(all_spectra,1);  % average for all segemnts 
 
 color1p = 'cyan'; color1n = 'blue'; 
-figure(3);clf; 
-%loglog(m,amp_b(:,:),-m,amp_b(:,:),'LineWidth',1); hold on 
-loglog(m,amp_all,'DisplayName','positive','LineWidth',3,'Color',color1p); hold on 
-loglog(-m,amp_all,'DisplayName','negative','LineWidth',3,'Color',color1n); hold on
-fill(m,amp_all+amp_err.upper, amp_all-amp_err.lower,'DisplayName','uncertain error bars','FaceColor','green')
+figure(4);clf; 
+loglog(m,mean_spectra1,'DisplayName','positive','LineWidth',3,'Color',color1p); hold on 
+loglog(-m,mean_spectra1,'DisplayName','negative','LineWidth',3,'Color',color1n); hold on
+%fill(m,amp_all+amp_err.upper, amp_all-amp_err.lower,'DisplayName','uncertain error bars','FaceColor','green')
 
 xline(1/100,'LineStyle','--','Color','k','DisplayName','m=1/100m')
 xline(1/300,'LineStyle','--','Color','k','DisplayName','m=1/300m')
 
-legend()
 ylabel('(m/s)^2/cpm')
 xlabel('cpm')
 
 %% save all of that for station 1 specifically, and then perform again for station 2 
 
-m1 = m; amp1 = amp_all; 
+m1 = m; amp1 = mean_spectra1; 
 amp_err1 = amp_err; 
 
 %% now with station 2 (have this in function form, but for now just manual) 
@@ -190,33 +220,34 @@ datetick; set(gca, 'YDir', 'reverse');
 xlabel('Time')
 ylabel('depth [m]')
 
-%% make rotary spectra 
+%% make rotary spectra for station 2 
 
 rotary = nan(nt,nz); 
 column_length = [];
+
 % make complex vector for each segment - ignore missing vals at bottom
 for it = 1:nt
     iz = find(~isnan(u(it,:)));
-    complex = u(it,iz)+i*v(it,iz); 
+    complex = u(it,iz)+1i*v(it,iz); 
     rotary(it,iz) = complex; 
-    column_length = cat(1,column_length,length(iz));
+    if length(iz) > 0
+        column_length = cat(1,column_length,length(iz));
+    end
 end
-
-
-
-%%
 
 % compute rotary spectra for each cast: U(t) = u(t) + i*v(t) 
 % only use minimum data to preserve spectra across casts 
 
-iz = find(column_length~=0); 
-min_depth = min(column_length(iz));
-data = rotary(iz,1:min_depth);
+it = find(~isnan(p(:,1))); 
+% new nt 
+nt = length(it);
+min_depth = min(column_length);
+data = rotary(it,1:min_depth);
 
-dates = LADCP2.time(find(~isnat(LADCP2.time))); 
+dates = LADCP2.time(it); 
 sampling_period = nanmean(diff(dates)); %dt between casts 
 dt = minutes(sampling_period); 
-N = nt; 
+N = length(it); 
 T=dt*N;
 fundamentalf=1/T;
 nyf=1/2/dt;
@@ -227,7 +258,7 @@ disp(sprintf('record length is %s long.',max(dates)-min(dates)))
 
 dz = nanmean(diff(p,1,2),'all'); 
 nz = min_depth;
-depths = p(1:min_depth);
+depths = p(:,1:min_depth);
 M = dz*min_depth; 
 fundamentalm = 1/M; 
 nym = 1/2/dz; 
@@ -238,95 +269,132 @@ disp(sprintf('record length is %d deep/long.',M))
 % Check it for nans!
 disp(['The record has ' num2str(length(find(isnan(data)))) ' NaNs.'])
 
-pidx = 112; % index for depth of ~451m
-figure(1); clf; hold on 
-title('plotting at 1 depth: ~450m');  
-plot(dates,real(data(:,pidx))); hold on
-plot(dates,imag(data(:,pidx)))
-ylabel('velocity [m/s]')
-xlabel('Time')
-legend('u','v')
-datetick
 
-castnum = 1;
-figure(2); clf; hold on 
-title('plotting first cast'); hold on 
-subplot(1,2,1); hold on 
-plot(real(data(castnum,:)),depths(castnum,:)); hold on
-plot(imag(data(castnum,:)),depths(castnum,:))
-set(gca,'YDir','reverse')
-ylabel('depth [m]')
-xlabel('velocity [m/s]')
-legend('u','v')
-xlim([-0.25,0.25])
-subplot(1,2,2); hold on 
-scatter(u(castnum,1:min_depth),depths(castnum,:)); hold on
-scatter(v(castnum,1:min_depth ),depths(castnum,:))
-set(gca,'YDir','reverse')
-ylabel('depth [m]')
-xlabel('velocity [m/s]')
-legend('u','v')
-xlim([-0.25,0.25])
+% pidx = 112; % index for depth of ~451m
+% figure(2)
+% title('plotting at 1 depth: ~1000m')
+% plot(dates,real(data(:,pidx))); hold on
+% plot(dates,imag(data(:,pidx)))
+% ylabel('velocity [m/s]')
+% xlabel('Time')
+% legend('u','v')
+% datetick
 
+
+figure(3); clf;
+title('plotting first cast')
+for castnum = 1 
+    subplot(1,2,1); hold on 
+    plot(real(data(castnum,:)),depths(castnum,:)); hold on
+    plot(imag(data(castnum,:)),depths(castnum,:))
+    set(gca,'YDir','reverse')
+    ylabel('depth [m]')
+    xlabel('velocity [m/s]')
+    legend('u','v')
+    xlim([-0.25,0.25])
+    subplot(1,2,2); hold on 
+    scatter(u(castnum,1:min_depth),depths(castnum,:)); hold on
+    scatter(v(castnum,1:min_depth ),depths(castnum,:))
+    set(gca,'YDir','reverse')
+    ylabel('depth [m]')
+    xlabel('velocity [m/s]')
+    legend('u','v')
+    xlim([-0.25,0.25])
+end
 
 
 %% Now we compute the rotary spectrum per cast .
 
-windowing = 1; 
-windows = nt; datapoints = nz;
 
-if windowing==1 %detrend and demean
-    datab = detrend(data);
+windows = N; datapoints = nz;
+
+% want an even spectra of datapoints 
+if rem(datapoints,2) ~= 0
+    % odd N 
+    datapoints = datapoints - 1 ; 
+    data = data(:,1:datapoints);
 end
 
-if windowing==2 %detrend and apply a Hanning window
-    w = hann(datapoints);
-    w = w/sqrt(mean(w.^2));
-    datab = detrend(data);
-    datab = datab.*w;
+all_spectra = nan(N,datapoints); 
+
+for cast = 1:N 
+
+    
+    if windowing==0 % just detrend and demean
+        datab = detrend(data(cast,:));
+    end
+    
+    if windowing==1 % detrend and apply a Hanning window
+        w = hann(datapoints);
+        w = w/sqrt(mean(w.^2));
+        datab = detrend(data(cast,:));
+        datab = datab.*w';
+    end
+    
+    b=fft(datab); % computes the fft for each cast
+    b=fftshift(b); % use fftshift to rearrange to have 0 wavenumber in the center
+    
+    % you should have to make some changes for odd N but the below code is
+    % when you normalize for a half space (only real) spectrum 
+    %if rem(datapoints,2)==0
+    %    amp_b=abs(b(:,1:datapoints/2+1)).^2; % even N
+    %else 
+    %    amp_b=abs(b(:,1:(datapoints+1)/2).^2); %  odd N
+    %end
+    
+    % square for spectrum
+    amp_b = abs(b(:,1:datapoints).^2);
+    % normalize amp
+    amp_b = amp_b / datapoints.^2;  % correct for the MATLAB normalization
+    % amp_b = amp_b .* 2;           % keeping the whole spectrum so do not want to multiply
+    amp_b = amp_b / fundamentalm;   % definition of the spectrum
+    
+    %error bars
+    nu=2*windows;
+    amp_err.upper = amp_b*nu/chi2inv(0.05/2,nu);     %upper
+    amp_err.lower = amp_b*nu/chi2inv(1-0.05/2,nu);   %lower 
+    
+    % Check whether it gives the variance to satisfy parsevals (for each individual window this must hold)     
+    variance = nanmean(abs(datab).^2);
+    sum_spec = sum(amp_b)*fundamentalm;
+    parsevals = sum_spec/variance;
+    if round(parsevals) ~= 1
+        disp('no parsevals!!')
+        parsevals 
+    end
+
+    % rotary wavenumber goes from negative fm to positive fm:
+    m=-datapoints/2*fundamentalm:fundamentalm:datapoints/2*fundamentalm-fundamentalm;
+
+
+           
+    % 
+    % color1p = 'm'; color1n = 'red'; 
+    % figure();clf; 
+    % loglog(m,amp_b,'DisplayName','positive','LineWidth',3,'Color',color1p); hold on 
+    % loglog(-m,amp_b,'DisplayName','negative','LineWidth',3,'Color',color1n); hold on
+    % % fill(m,amp_b+amp_err.upper, amp_b-amp_err.lower,'DisplayName','uncertain error bars','FaceColor','green')
+    % 
+    % xline(1/100,'LineStyle','--','Color','k','DisplayName','m=1/100m')
+    % xline(1/300,'LineStyle','--','Color','k','DisplayName','m=1/300m')
+    % 
+    % ylabel('(m/s)^2/cpm')
+    % xlabel('cpm')
+    % legend()
+
+    all_spectra(cast,:) = amp_b; 
+
 end
 
-b=fft(datab); % computes the fft for each cast
-b=fftshift(b); % use fftshift to rearrange to have 0 wavenumber in the center
+%% take their average 
 
-% you should have to make some changes for odd N 
-%if rem(datapoints,2)==0
-%amp_b=abs(b(:,1:datapoints/2+1)).^2; % even N
-%else 
-%amp_b=abs(b(:,1:(datapoints+1)/2).^2); %  odd N
-%end
+mean_spectra2 = mean(all_spectra,1);  % average for all segemnts 
 
-% square for spectrum
-amp_b = abs(b(:,1:datapoints).^2); 
-% normalize amp
-amp_b = amp_b / datapoints.^2;  % correct for the MATLAB normalization
-% amp_b = amp_b .* 2;           % keeping the whole spectrum so do not want to multiply
-amp_b = amp_b / fundamentalm;   % definition of the spectrum
-amp_all = mean(amp_b,1);  % average for all segemnts 
-
-%error bars
-nu=2*windows;
-amp_err.upper = amp_all*nu/chi2inv(0.05/2,nu);     %upper
-amp_err.lower = amp_all*nu/chi2inv(1-0.05/2,nu);   %lower 
-
-%Check whether it gives the variance to satisfy parsevals
-variance = nanmean(abs(datab).^2,'all')
-sum_spec = sum(amp_all)*fundamentalm
-parsevals = sum_spec/variance
-
-
-% rotary wavenumber goes from negative fm to positive fm:
-m=-datapoints/2*fundamentalm:fundamentalm:datapoints/2*fundamentalm-fundamentalm;
-
-%%
-
-
-color1p = 'cyan'; color1n = 'blue'; 
-figure(3);clf; 
-%loglog(m,amp_b(:,:),-m,amp_b(:,:),'LineWidth',1); hold on 
-loglog(m,amp_all,'DisplayName','positive','LineWidth',3,'Color',color1p); hold on 
-loglog(-m,amp_all,'DisplayName','negative','LineWidth',3,'Color',color1n); hold on
-fill(m,amp_all+amp_err.upper, amp_all-amp_err.lower,'DisplayName','uncertain error bars','FaceColor','green')
+color1p = 'm'; color1n = 'red'; 
+figure(4);clf; 
+loglog(2*m,mean_spectra2,'DisplayName','positive','LineWidth',3,'Color',color1p); hold on 
+loglog(-2*m,mean_spectra2,'DisplayName','negative','LineWidth',3,'Color',color1n); hold on
+%fill(m,amp_all+amp_err.upper, amp_all-amp_err.lower,'DisplayName','uncertain error bars','FaceColor','green')
 
 xline(1/100,'LineStyle','--','Color','k','DisplayName','m=1/100m')
 xline(1/300,'LineStyle','--','Color','k','DisplayName','m=1/300m')
@@ -335,9 +403,12 @@ legend()
 ylabel('(m/s)^2/cpm')
 xlabel('cpm')
 
-%% save all of that for station 1 specifically, and then perform again for station 2 
 
-m2 = m; amp2 = amp_all; 
+
+
+%% save all of that for station 2 specifically
+
+m2 = m; amp2 = mean_spectra2; 
 amp_err2 = amp_err; 
 
 %%
@@ -346,20 +417,38 @@ amp_err2 = amp_err;
 color1p = 'cyan'; color1n = 'blue'; 
 color2p = 'red'; color2n = 'magenta'; 
 fig = figure(3);clf; 
-loglog(m1,amp1,'DisplayName','1+','LineWidth',3,'Color',color1p); hold on 
-loglog(-m1,amp1,'DisplayName','1-','LineWidth',3,'Color',color1n); hold on
-fill(m1,amp1+amp_err1.upper, amp1-amp_err1.lower,'DisplayName','uncertain error bars','FaceColor','green')
+set(gcf, 'Color', 'w');
 
-loglog(m2,amp2,'DisplayName','2+','LineWidth',3,'Color',color2p); hold on 
-loglog(-m2,amp2,'DisplayName','2-','LineWidth',3,'Color',color2n); hold on
-fill(m2,amp2+amp_err2.upper, amp2-amp_err2.lower,'DisplayName','uncertain error bars','FaceColor','yellow')
+loglog(m1,amp1,'DisplayName','Station1 +','LineWidth',3,'Color',color1p); hold on 
+loglog(-m1,amp1,'DisplayName','Station1 -','LineWidth',3,'Color',color1n); hold on
+%fill(m1,amp1+amp_err1.upper, amp1-amp_err1.lower,'DisplayName','uncertain error bars','FaceColor','green')
 
-xline(1/100,'LineStyle','--','Color','k','DisplayName','m=1/100m')
-xline(1/300,'LineStyle','--','Color','k','DisplayName','m=1/300m')
+loglog(m2,amp2,'DisplayName','Station2 +','LineWidth',3,'Color',color2p); hold on 
+loglog(-m2,amp2,'DisplayName','Station2 -','LineWidth',3,'Color',color2n); hold on
+%fill(m2,amp2+amp_err2.upper, amp2-amp_err2.lower,'DisplayName','uncertain error bars','FaceColor','yellow')
 
-legend()
-ylabel('(m/s)^2/cpm')
-xlabel('cpm')
+xline(1/100,'LineStyle','--','Color','k','DisplayName','m=1/100m','LineWidth',1.5)
+xline(1/300,'LineStyle','-.','Color','k','DisplayName','m=1/300m','LineWidth',1.5)
 
-saveas(fig,sprintf('%s/wavenumber_spectra_firstpass_stats12.png',figure_dir))
 
+
+legend('FontSize',12)
+grid on; 
+ylabel({'\bf Spectral Amplitude','(m/s)^2/cpm'},'FontSize', 14)
+%xlabel('cpm')
+xlabel({'\bfWavenumber', 'cpm'}, 'FontSize', 14);
+if windowing == 0
+    title({'\bf SLE Stations 1 & 2 Rotary Spectra of U/V Velocities','No Windowing'}, 'FontName', 'Helvetica', 'FontSize', 16)
+elseif windowing == 1
+    title({'\bf SLE Stations 1 & 2 Rotary Spectra of U/V Velocities','Hanning Window'}, 'FontName', 'Helvetica', 'FontSize', 16)
+end
+
+%%
+figure_dir = '/home/vboatwright/OneDrive/Documents/SIO/projects/santalucia/figures/ladcp_figures/'
+% saveas(fig,sprintf('%s/wavenumber_hanning-spectra_stations12.png',figure_dir))
+
+if windowing == 0
+    saveas(fig,sprintf('%s/wavenumber_spectra_stations12.png',figure_dir))
+elseif windowing == 1
+    saveas(fig,sprintf('%s/wavenumber_hanning-spectra_stations12.png',figure_dir))
+end

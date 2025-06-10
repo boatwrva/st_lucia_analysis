@@ -83,10 +83,13 @@ lat = nan(numcasts,1);
 time = NaT(numcasts,1);
 
 
+zlevcount = []; 
+ctdlevcount = []; 
+
 for cc = casts
  
-    if cc == 21 || cc ==26 
-        % skip these 
+    if cc == 21
+        % skip cast 21 still  
         % leave as nan 
 
     else
@@ -109,8 +112,10 @@ for cc = casts
     
     p_cast = S.dr.p; 
     time_cast = datetime(S.dr.date); 
+
      
-    %disp(length(p_cast))
+    disp(length(p_cast))
+    zlevcount = cat(1,zlevcount,length(p_cast));
     
     % check the uv ctd 
     u_ctd_cast = S.dr.uctd; 
@@ -123,6 +128,7 @@ for cc = casts
     slat = S.dr.shiplat; 
 
     disp(length(u_ctd_cast))
+    ctdlevcount = cat(1,ctdlevcount,length(u_ctd_cast)) ;
 
     % save T, S - though bad data 
     t_ctd = S.dr.ctd_t;
@@ -147,8 +153,8 @@ for cc = casts
     s_all(cc,1:length(p_cast)) = s_ctd; 
     
     u_ctd(cc,1:length(u_ctd_cast)) = u_ctd_cast; 
-    v_ctd(cc,1:length(u_ctd_cast)) = u_ctd_cast;
-    w_ctd(cc,1:length(u_ctd_cast)) = u_ctd_cast;
+    v_ctd(cc,1:length(u_ctd_cast)) = v_ctd_cast;
+    w_ctd(cc,1:length(u_ctd_cast)) = w_ctd_cast;
 
     ship_lon(cc,1:length(u_ctd_cast)) = slon;    
     ship_lat(cc,1:length(u_ctd_cast)) = slat;
@@ -158,6 +164,8 @@ for cc = casts
 end
 
 %% now plot 
+addpath '/home/vboatwright/OneDrive/Documents/SIO/projects/santalucia/st_lucia_analysis' 
+
 
 cast_dim = repmat(casts,zlevels,1)'; 
 time_dim = repmat(time,1,zlevels); 
@@ -170,9 +178,9 @@ shading flat
 xlabel('Time'); ylabel('Depth [dbar]')
 xtickformat('dd HH:mm')
 set(gca, 'YDir', 'reverse')
-cb = colorbar;
+cb = colorbar; cmocean('balance')
 ylabel(cb,'u [m/s]','Rotation',270)
-clim([-0.2 0.2])
+clim([-0.2 0.2]); xlim([datetime(2025,2,28,13,0,0) datetime(2025,3,1,15,0,0)])
 
 subplot(2,1,2); hold on 
 title('v velocity')
@@ -181,10 +189,9 @@ shading flat
 xlabel('Date'); ylabel('Depth [dbar]')
 xtickformat('MM-dd HH:mm')
 set(gca, 'YDir', 'reverse')
-cb = colorbar;
+cb = colorbar; cmocean('balance')
 ylabel(cb,'v [m/s]','Rotation',270)
-clim([-0.2 0.2])
-
+clim([-0.2 0.2]); xlim([datetime(2025,2,28,13,0,0) datetime(2025,3,1,15,0,0)])
 
 %% calculate shear 
 
@@ -218,7 +225,7 @@ pcolor(cast_dim,p_all,shear_u);
 shading flat 
 xlabel('Cast #'); ylabel('Depth [dbar]')
 set(gca, 'YDir', 'reverse')
-cb = colorbar;
+cb = colorbar; cmocean('balance')
 ylabel(cb,'du/dz [1/s]','Rotation',270)
 clim([-0.0125 0.0125])
 
@@ -228,7 +235,7 @@ pcolor(cast_dim,p_all,shear_v);
 shading flat 
 xlabel('Cast #'); ylabel('Depth [dbar]')
 set(gca, 'YDir', 'reverse')
-cb = colorbar;
+cb = colorbar; cmocean('balance')
 ylabel(cb,'dv/dz [1/s]','Rotation',270)
 clim([-0.0125 0.0125])
 
