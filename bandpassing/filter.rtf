@@ -1,0 +1,146 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2761
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fnil\fcharset0 Menlo-Italic;\f1\fnil\fcharset0 Menlo-Regular;}
+{\colortbl;\red255\green255\blue255;\red134\green78\blue169;\red0\green11\blue19;\red84\green114\blue192;
+\red212\green174\blue117;\red28\green92\blue255;\red27\green66\blue117;\red236\green101\blue197;\red34\green158\blue53;
+\red255\green235\blue173;\red43\green53\blue116;\red143\green28\blue53;\red134\green78\blue169;\red0\green11\blue19;
+\red84\green114\blue192;\red212\green174\blue117;\red28\green92\blue255;\red43\green53\blue116;\red27\green66\blue117;
+\red255\green235\blue173;}
+{\*\expandedcolortbl;;\cssrgb\c60000\c40000\c72157;\cssrgb\c0\c4706\c9412;\cssrgb\c40000\c53333\c80000;
+\cssrgb\c86667\c73333\c53333;\cssrgb\c13333\c46667\c100000;\cssrgb\c13333\c33333\c53333;\cssrgb\c94902\c50196\c81569;\cssrgb\c13333\c66667\c26667;
+\cssrgb\c100000\c93333\c73333;\cssrgb\c21961\c28235\c52941;\cssrgb\c63529\c17647\c26667;\cssrgb\c60000\c40000\c72157;\cssrgb\c0\c4706\c9412;
+\cssrgb\c40000\c53333\c80000;\cssrgb\c86667\c73333\c53333;\cssrgb\c13333\c46667\c100000;\cssrgb\c21961\c28235\c52941;\cssrgb\c13333\c33333\c53333;
+\cssrgb\c100000\c93333\c73333;}
+\margl1440\margr1440\vieww15880\viewh14540\viewkind0
+\deftab720
+\pard\pardeftab720\partightenfactor0
+
+\f0\i\fs24 \cf2 \cb3 \expnd0\expndtw0\kerning0
+def
+\f1\i0 \cf4  \cf5 smooth_gap\cf4 (
+\f0\i \cf6 u
+\f1\i0 \cf4 ,
+\f0\i \cf6 wt
+\f1\i0 \cf4 ,
+\f0\i \cf6 ngap
+\f1\i0 \cf4  \cf7 =\cf4  \cf8 0.8\cf4 ):\cb1 \
+\cb3     \cf9 '''Apply convolution filter with weights specified by w;\cf4 \cb1 \
+\pard\pardeftab720\partightenfactor0
+\cf9 \cb3     ngap specifies percentage of the total filter that should be used;\cf4 \cb1 \
+\cf9 \cb3     code adapted from Mark Merrifield, Revised Aug, 2023 '''\cf4 \cb1 \
+\pard\pardeftab720\partightenfactor0
+\cf4 \cb3     \cb1 \
+\cb3     
+\f0\i \cf6 u
+\f1\i0 \cf4  \cf7 =\cf4  
+\f0\i \cf6 u
+\f1\i0 \cf4 [:]\cb1 \
+\cb3     uflag \cf7 =\cf4  \cf10 \ul \ulc10 np\cf4 \ulnone .\cf5 ones\cf4 (\cf5 len\cf4 (
+\f0\i \cf6 u
+\f1\i0 \cf4 ))\cb1 \
+\pard\pardeftab720\partightenfactor0
+\cf4 \cb3     uflag[\cf10 \ul np\cf4 \ulnone .isnan(
+\f0\i \cf6 u
+\f1\i0 \cf4 )] \cf7 =\cf4  \cf8 0\cf4 \cb1 \
+\cb3     uzero \cf7 =\cf4  
+\f0\i \cf6 u
+\f1\i0 \cf4 .copy()\cb1 \
+\cb3     uzero[\cf10 \ul np\cf4 \ulnone .isnan(
+\f0\i \cf6 u
+\f1\i0 \cf4 )] \cf7 =\cf4  \cf8 0\cf4 \cb1 \
+\cb3     \cb1 \
+\cb3     \cf11 #add zeros to front and end of time series \cf4 \cb1 \
+\cb3     n \cf7 =\cf4  \cf5 len\cf4 (
+\f0\i \cf6 u
+\f1\i0 \cf4 )\cb1 \
+\cb3     nwt \cf7 =\cf4  \cf5 len\cf4 (
+\f0\i \cf6 wt
+\f1\i0 \cf4 )\cb1 \
+\cb3     nwt2 \cf7 =\cf4  \cf10 \ul int\cf4 \ulnone (\cf10 \ul np\cf4 \ulnone .floor(nwt\cf7 /\cf8 2\cf4 ))\cb1 \
+\cb3     uu \cf7 =\cf4  \cf10 \ul np\cf4 \ulnone .\cf5 zeros\cf4 (\cf10 \ul int\cf4 \ulnone (n \cf7 +\cf4  \cf8 2\cf4  \cf7 *\cf4  nwt2))\cb1 \
+\cb3     uu[nwt2:(\cf2 len\cf4 (uu)\cf7 -\cf4 nwt2)] \cf7 =\cf4  
+\f0\i \cf6 u
+\f1\i0 \cf4 \cb1 \
+\cb3     uuflag \cf7 =\cf4  \cf10 \ul np\cf4 \ulnone .\cf5 zeros\cf4 (\cf10 \ul int\cf4 \ulnone (n \cf7 +\cf4  \cf8 2\cf4  \cf7 *\cf4  nwt2))\cb1 \
+\cb3     uuflag[nwt2:(\cf2 len\cf4 (uu)\cf7 -\cf4 nwt2)] \cf7 =\cf4  uflag\cb1 \
+\cb3     \cb1 \
+\cb3     \cf11 #apply convolution\cf4 \cb1 \
+\cb3     ua \cf7 =\cf4  \cf10 \ul np\cf4 \ulnone .\cf5 convolve\cf4 (uu,
+\f0\i \cf6 wt
+\f1\i0 \cf4 ,
+\f0\i \cf6 mode
+\f1\i0 \cf4  \cf7 =\cf4  \cf9 'same'\cf4 )\cb1 \
+\cb3     \cb1 \
+\cb3     \cf11 # Convolve flag vector with wt, and normalize output ua; \cf4 \cb1 \
+\cb3     nu \cf7 =\cf4  \cf10 \ul np\cf4 \ulnone .\cf5 convolve\cf4 (uuflag,
+\f0\i \cf6 wt
+\f1\i0 \cf4 ,
+\f0\i \cf6 mode
+\f1\i0 \cf4  \cf7 =\cf4  \cf9 'same'\cf4 )\cf12 ;\cf4 \cb1 \
+\cb3     ua \cf7 =\cf4  ua\cf2 /\cf4 nu\cb1 \
+\
+\cb3     \cf11 #NaN out data if nu/sum(wt) < 0.8\cf4 \cb1 \
+\cb3     kn \cf7 =\cf4  \cf10 \ul np\cf4 \ulnone .\cf5 argwhere\cf4 (nu\cf2 /\cf10 \ul np\cf4 \ulnone .\cf5 sum\cf4 (
+\f0\i \cf6 wt
+\f1\i0 \cf4 ) \cf7 <\cf4  
+\f0\i \cf6 ngap
+\f1\i0 \cf4 )\cb1 \
+\cb3     ua[kn] \cf7 =\cf4  \cf10 \ul np\cf4 \ulnone .nan\cb1 \
+\cb3     \cb1 \
+\cb3     \cf11 #trim off weights\cf4 \cb1 \
+\cb3     ua \cf7 =\cf4  ua[nwt2:nwt2\cf7 +\cf4 n]\cb1 \
+\cb3     \cf7 return\cf4  ua\cb1 \
+\
+\
+\pard\pardeftab720\partightenfactor0
+
+\f0\i \cf2 \cb3 def
+\f1\i0 \cf4  \cf5 band_pass\cf4 (
+\f0\i \cf6 timeseries
+\f1\i0 \cf4 ,
+\f0\i \cf6 wt_low
+\f1\i0 \cf4 ,
+\f0\i \cf6 wt_high
+\f1\i0 \cf4 ):\cb1 \
+\pard\pardeftab720\partightenfactor0
+\cf4 \cb3     mean \cf7 =\cf4  \cf10 \ul np\cf4 \ulnone .\cf5 nanmean\cf4 (
+\f0\i \cf6 timeseries
+\f1\i0 \cf4 )\cb1 \
+\cb3     rm_high \cf7 =\cf4  \cf5 smooth_gap\cf4 (
+\f0\i \cf6 timeseries
+\f1\i0 \cf7 -\cf4 mean,
+\f0\i \cf6 wt_high
+\f1\i0 \cf4 ) #smooth out higher freqs\cb1 \
+\cb3     low_freq \cf7 =\cf4  \cf5 smooth_gap\cf4 (
+\f0\i \cf6 timeseries
+\f1\i0 \cf7 -\cf4 mean,
+\f0\i \cf6 wt_low
+\f1\i0 \cf4 ) #isolate lower freqs\cb1 \
+\cb3     \cf7 return\cf4  rm_high \cf7 -\cf4  low_freq \cf7 +\cf4  mean #subtract low freq from smoothed arr\
+\
+\pard\pardeftab720\partightenfactor0
+
+\f0\i \cf13 \cb14 \outl0\strokewidth0 \strokec13 def
+\f1\i0 \cf15 \strokec15  \cf16 \strokec16 band_pass2\cf15 \strokec15 (
+\f0\i \cf17 \strokec17 arr
+\f1\i0 \cf15 \strokec15 ,
+\f0\i \cf17 \strokec17 wtlow
+\f1\i0 \cf15 \strokec15 ,
+\f0\i \cf17 \strokec17 wthigh
+\f1\i0 \cf15 \strokec15 ):\cb1 \
+\cb14     \cf18 \strokec18 #high pass\cf15 \cb1 \strokec15 \
+\cb14     mean \cf19 \strokec19 =\cf15 \strokec15  \cf20 \ul \ulc20 \strokec20 np\cf15 \ulnone \strokec15 .\cf16 \strokec16 nanmean\cf15 \strokec15 (
+\f0\i \cf17 \strokec17 arr
+\f1\i0 \cf15 \strokec15 )\cb1 \
+\cb14     rmhigh \cf19 \strokec19 =\cf15 \strokec15  
+\f0\i \cf17 \strokec17 arr
+\f1\i0 \cf15 \strokec15  \cf19 \strokec19 -\cf15 \strokec15  \cf16 \strokec16 smooth_gap\cf15 \strokec15 (
+\f0\i \cf17 \strokec17 arr
+\f1\i0 \cf15 \strokec15 ,
+\f0\i \cf17 \strokec17 wtlow
+\f1\i0 \cf15 \strokec15 ) \cf18 \strokec18 #high pass w lower frequency\cf15 \cb1 \strokec15 \
+\cb14     \cf19 \strokec19 return\cf15 \strokec15  \cf16 \strokec16 smooth_gap\cf15 \strokec15 (rmhigh,
+\f0\i \cf17 \strokec17 wthigh
+\f1\i0 \cf15 \strokec15 ) \cf19 \strokec19 +\cf15 \strokec15  mean \cf18 \strokec18 #apply low pass to removed \cf15 \cb1 \strokec15 \
+\pard\pardeftab720\partightenfactor0
+\cf4 \outl0\strokewidth0 \
+}

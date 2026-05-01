@@ -4,17 +4,14 @@
 data_dir = '/home/vboatwright/OneDrive/Documents/SIO/projects/santalucia/data/processed_ship/'; 
 out_dir = '/home/vboatwright/OneDrive/Documents/SIO/projects/santalucia/data/processed_ship/';
 
-station = 1; 
+station = 2; 
 
 ladcp_dir = [data_dir 'ladcp/station' num2str(station) '/']; 
-
 
 cast = 1; 
 file = sprintf('%02d.mat',cast);
 fn = [ladcp_dir file]; 
 S = load(fn); 
-
-
 
 % load variables
 u_cast = S.dr.u; 
@@ -63,7 +60,6 @@ elseif station == 2
     zlevels = 234; 
     ctdlevs = 328; 
 end
-
 
 u_all = nan(numcasts,zlevels); 
 v_all = nan(numcasts,zlevels); 
@@ -301,54 +297,8 @@ clim([-0.2 0.2]);
 %xlim([datetime(2025,2,28,13,0,0) datetime(2025,3,1,15,0,0)])
 
 
-%% calculate shear 
-
-
-[nc,nz] = size(p_grid);
-shear_u = nan(nc,nz);
-shear_v = nan(nc,nz);
-
-disp(size(shear_u))
-for cc = 1:nc 
-    % need to do individually for each column because they each start at a different point due to NaNs
-    
-    for ii = 1:nz-1
-        % going from the top to bottom  
-        
-        if isnan(u_grid(cc,ii+1)) == 0
-            % do shear calculations only if the level below has a value 
-            shear_u(cc,ii) = (u_grid(cc,ii+1)-u_grid(cc,ii)) / (p_grid(cc,ii+1) - p_grid(cc,ii)); 
-            shear_v(cc,ii) = (v_grid(cc,ii+1)-v_grid(cc,ii)) / (p_grid(cc,ii+1) - p_grid(cc,ii));
-
-        end 
-    end
-end
-
-
-%% now plot shear
-
-figure()
-subplot(2,1,1); hold on 
-title('u shear')
-pcolor(time_grid,p_grid,shear_u); 
-shading flat 
-xlabel('Cast #'); ylabel('Depth [dbar]')
-set(gca, 'YDir', 'reverse')
-cb = colorbar; cmocean('balance')
-ylabel(cb,'du/dz [1/s]','Rotation',270)
-clim([-0.015 0.015])
-
-subplot(2,1,2); hold on 
-title('v shear')
-pcolor(time_grid,p_grid,shear_v); 
-shading flat 
-xlabel('Cast #'); ylabel('Depth [dbar]')
-set(gca, 'YDir', 'reverse')
-cb = colorbar; cmocean('balance')
-ylabel(cb,'dv/dz [1/s]','Rotation',270)
-clim([-0.015 0.015])
-
-%% based on wavenumber analysis, need to interpolate to 20m to calculate shear
+%% calculate shear: 
+% based on wavenumber analysis, need to interpolate to 20m to calculate shear
 
 % can we do a rolling smoother or do we need to straight up coarsen? 
 % lets try both 
@@ -432,7 +382,7 @@ end
 
 fig1=figure()
 subplot(3,2,1); hold on 
-[t,s] = title('Station 1','interpolated u velocity');
+[t,s] = title('Station 2','interpolated u velocity');
 pcolor(x',y',interp_u); 
 shading flat 
 xlabel('Time'); ylabel('Depth [dbar]')
@@ -442,7 +392,7 @@ ylabel(cb,'u velocity [m/s]','Rotation',270)
 clim([-0.25 0.25])
 
 subplot(3,2,2); hold on 
-[t,s] = title('Station 1','interpolated v velocity');
+[t,s] = title('Station 2','interpolated v velocity');
 pcolor(x',y',interp_v); 
 shading flat 
 xlabel('Time'); ylabel('Depth [dbar]')
@@ -483,48 +433,13 @@ cmocean('balance'); cb = colorbar;
 set(gca,'ColorScale','log');
 ylabel(cb,'(du/dz )^2 + (dv/dz)^2 [1/s2]','Rotation',270)
 
-%%
-subplot(3,2,5); hold on 
-subtitle('rolling u shear')
-pcolor(time_grid, p_grid,rolling_shear_u); 
-shading flat 
-xlabel('Time'); ylabel('Depth [dbar]')
-set(gca, 'YDir', 'reverse')
-cmocean('balance'); cb = colorbar;
-ylabel(cb,'du/dz [1/s]','Rotation',270)
-clim([-0.01 0.01])
-
-subplot(3,2,6); hold on 
-subtitle('rolling v shear')
-pcolor(time_grid, p_grid,rolling_shear_v); 
-shading flat 
-xlabel('Time'); ylabel('Depth [dbar]')
-set(gca, 'YDir', 'reverse')
-cmocean('balance'); cb = colorbar;
-ylabel(cb,'dv/dz [1/s]','Rotation',270)
-clim([-0.01 0.01])
-
-
 
 %% first pass variable save 
 
-% station 1 
-
-LADCP1 = struct; 
-LADCP1.lon = lon; LADCP1.lat = lat; LADCP1.time = time; 
-LADCP1.u = u_all; LADCP1.v = v_all; LADCP1.p = p_all; 
-LADCP1.u_shearmethod = u_shearmethod; LADCP1.v_shearmethod = v_shearmethod; LADCP1.w_shearmethod = w_shearmethod; 
-LADCP1.tctd = t_ctd; LADCP1.sctd = s_ctd; 
-LADCP1.u_ctd = u_ctd; LADCP1.v_ctd = v_ctd; LADCP1.w_ctd = w_ctd; 
-LADCP1.ship_lon = ship_lon; LADCP1.ship_lat = ship_lat; 
-
-save([out_dir 'LADCP_station' num2str(station)],'LADCP1'); 
-
-%%
 % save ladcp depths to interpolate with CTD 
 ladcp_p = p_all; 
 
-%% station 1 struct 
+%% station 2 struct 
 
 % what to save: 
 % time dimension (at each grid point); time coordinate (for each cast)
@@ -533,37 +448,37 @@ ladcp_p = p_all;
 % raw u/v separated into up/down. gridded (20m) u/v. only down u/v
 % gridded shear (20m) 
 
-STAT1 = struct; 
-STAT1.ladcp_lon = ladcp_lon; STAT1.ladcp_lat = ladcp_lat; 
-STAT1.ladcp_time_coord = time_updo; STAT1.ladcp_time_grid = time_grid; 
-STAT1.u = u_grid; STAT1.v = v_grid; 
-STAT1.ladcp_p_coord = interp_grid; STAT1.ladcp_p_grid = p_grid; 
+STAT2 = struct; 
+STAT2.ladcp_lon = ladcp_lon; STAT2.ladcp_lat = ladcp_lat; 
+STAT2.ladcp_time_coord = time_updo; STAT2.ladcp_time_grid = time_grid; 
+STAT2.u = u_grid; STAT2.v = v_grid; 
+STAT2.ladcp_p_coord = interp_grid; STAT2.ladcp_p_grid = p_grid; 
 
-STAT1.interp_u = interp_u; STAT1.interp_v = interp_v; 
+STAT2.interp_u = interp_u; STAT2.interp_v = interp_v; 
 
-STAT1.shear_coord = shear_grid; 
-STAT1.interp_shear_u = interp_shear_u; STAT1.interp_shear_v = interp_shear_v; 
+STAT2.shear_coord = shear_grid; 
+STAT2.interp_shear_u = interp_shear_u; STAT2.interp_shear_v = interp_shear_v; 
 
 
 %% station 2 
 
 
 LADCP2 = struct; 
-LADCP2.lon = lon; LADCP2.lat = lat; LADCP2.time = time; 
+LADCP2.lon = ladcp_lon; LADCP2.lat = ladcp_lat; LADCP2.time = ladcp_time; 
 LADCP2.u = u_all; LADCP2.v = v_all; LADCP2.p = p_all; 
 LADCP2.u_shearmethod = u_shearmethod; LADCP2.v_shearmethod = v_shearmethod; LADCP2.w_shearmethod = w_shearmethod; 
 LADCP2.tctd = t_ctd; LADCP2.sctd = s_ctd; 
 LADCP2.u_ctd = u_ctd; LADCP2.v_ctd = v_ctd; LADCP2.w_ctd = w_ctd; 
 LADCP2.ship_lon = ship_lon; LADCP2.ship_lat = ship_lat; 
 
-save([out_dir 'LADCP_station' num2str(station)],'LADCP2'); 
+% save([out_dir 'LADCP_station' num2str(station)],'LADCP2'); 
 
 
 %% now concatenate temp and salinity from .mat files 
 
 ctd_dir = [data_dir 'ctd_mat/station' num2str(station) '/']; 
 
-station = 1;
+station = 2;
 cruise = 'SR2503';
 
 if station == 1
@@ -610,6 +525,11 @@ plot(s1d,depth)
 
 %% process and concatenate 
 
+addpath /home/vboatwright/OneDrive/Documents/SIO/projects/gsw_matlab
+addpath /home/vboatwright/OneDrive/Documents/SIO/projects/gsw_matlab/library
+addpath /home/vboatwright/OneDrive/Documents/SIO/projects/gsw_matlab/thermodynamics_from_t
+
+
 % for station 1: 18 casts 
 if station == 1 
     casts = 1:18; 
@@ -646,6 +566,11 @@ depth_all = nan(numcasts,zlevels);
 % separate out upcast and downcast - will decide per cast which sensor is best
 t_grid = nan(numcasts*2,zlevels); 
 s_grid = nan(numcasts*2,zlevels); 
+
+CT_grid = nan(numcasts*2,zlevels); 
+SA_grid = nan(numcasts*2,zlevels); 
+rho_grid = nan(numcasts*2,zlevels); 
+
 p_grid = nan(numcasts*2,zlevels); 
 date_grid = NaT(numcasts*2,zlevels); 
 time_grid = nan(numcasts*2,zlevels); 
@@ -740,8 +665,18 @@ for cc = casts
 
     
     % put it all together on the _grid files: 
+    % and perform GSW analysis on each cast 
+    
 
     % downcasts
+    sa_do = gsw_SA_from_SP(s1_goingdo,p_goingdo,mean(ladcp_lon),mean(ladcp_lat)); 
+    ct_do = gsw_CT_from_t(sa_do,t1_goingdo,p_goingdo); 
+    
+    SA_grid(1+(cc-1)*2,1:zlength) = sa_do; 
+    CT_grid(1+(cc-1)*2,1:zlength) = ct_do; 
+    p_ref = 0; 
+    rho_grid(1+(cc-1)*2,1:zlength) = gsw_rho(sa_do,ct_do,p_ref); 
+
     t_grid(1+(cc-1)*2,1:zlength) = t1_goingdo; 
     s_grid(1+(cc-1)*2,1:zlength) = s1_goingdo; 
     p_grid(1+(cc-1)*2,1:zlength) = p_goingdo;  
@@ -760,6 +695,14 @@ for cc = casts
     date_grid(cc*2,1:zlength) = date_goingup;
     time_grid(cc*2,1:zlength) = time_goingup;     
 
+    sa_up = gsw_SA_from_SP(s1_goingup,p_goingup,mean(ladcp_lon),mean(ladcp_lat)); 
+    ct_up = gsw_CT_from_t(sa_up,t1_goingup,p_goingup); 
+
+    SA_grid(cc*2,1:zlength) = sa_up; 
+    CT_grid(cc*2,1:zlength) = ct_up; 
+    p_ref = 0; 
+    rho_grid(cc*2,1:zlength) = gsw_rho(sa_up,ct_up,p_ref); 
+
     lon_grid(cc*2,1:zlength) = lon_goingup; 
     lat_grid(cc*2,1:zlength) = lat_goingup; 
 
@@ -767,6 +710,13 @@ for cc = casts
 
     % gridded?
     % time_updo(cc*2) = time_middle; 
+    
+    figure()
+    plot(ct_do,p_goingdo); hold on 
+    plot(sa_do,p_goingdo)
+
+    plot(ct_up,p_goingup); hold on 
+    plot(sa_up,p_goingup)
 
 
     end
@@ -774,17 +724,6 @@ for cc = casts
 end
 
 
-%% convert all of that with GSW toolbox: 
-addpath /home/vboatwright/OneDrive/Documents/SIO/projects/gsw_matlab
-addpath /home/vboatwright/OneDrive/Documents/SIO/projects/gsw_matlab/library
-addpath /home/vboatwright/OneDrive/Documents/SIO/projects/gsw_matlab/thermodynamics_from_t
-
-% first: change fields from practical salinity to absolute salinity 
-
-SA_grid = gsw_SA_from_SP(s_grid,p_grid,mean(ladcp_lon),mean(ladcp_lat)); 
-CT_grid = gsw_CT_from_t(SA_grid,t_grid,p_grid); 
-p_ref = 0; 
-rho_grid = gsw_rho(SA_grid,CT_grid,p_ref); 
 
 
 %% now plot 
@@ -825,6 +764,169 @@ colormap(gca,cmocean('dense'));
 cb = colorbar;
 ylabel(cb,'[psu]','Rotation',270)
 %clim([32 36])
+
+
+%% weird - my GSW functions seem to not be working for that data 
+% use Kerstins scripts 
+
+% first read in all the files
+datadir = '/home/vboatwright/OneDrive/Documents/SIO/projects/santalucia/data/processed_ship/ctd_mat/station2/';
+files = dir(fullfile(datadir, 'station_2SR2503_POstation_2_cast_*.mat'));
+filelist = fullfile({files.folder}, {files.name})';
+
+
+% first a visual inspection
+for ii = 1:34
+    load(filelist{ii});
+
+    t1 = datad.t1;
+    t2 = datad.t2;
+    s1 = datad.s1;
+    s2 = datad.s2;
+
+    lengths(ii) = length(t1);
+
+%     figure(ii)
+%     clf
+%     subplot(1,2,1)
+%     plot([t1 t2],datad.depth)
+%     legend('t1','t2'); axis ij
+%     xlim([2 15])
+%     subplot(1,2,2)
+%     plot([s1 s2],datad.depth)
+%     legend('s1','s2'); axis ij
+%     xlim([30 36])
+%     title(['Cast number: ' num2str(ii)])
+    
+end
+clear datad datau datad_1m datau_1m
+
+
+%% 
+
+% based on those plots this is a first best guess on which is "prettiest"
+goodT = [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1];
+goodS = [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1];
+
+% set up matrices for putting the data in, 34 casts
+Temp2 = nan(max(lengths),34);
+Sal2 = Temp2; Pres2 = Temp2;
+dn2 = nan(1,34);
+
+for ii = 1:34
+    load(filelist{ii});
+
+    if goodT(ii) == 1
+    T = datad.t1;
+    else
+    T = datad.t2;
+    end
+
+    if goodS(ii) == 1
+    S = datad.s1;
+    else
+    S = datad.s2;
+    end
+
+    Temp2(1:lengths(ii),ii) = fillmissing(T,'linear');
+    Sal2(1:lengths(ii),ii) = fillmissing(S,'linear');
+    Pres2(1:lengths(ii),ii) = fillmissing(datad.p,'linear');
+    dn2(ii) = nanmean(datad.datenum);
+   
+end
+
+clear datad datau datad_1m datau_1m
+
+%% plotting time, let's do this against time since this is the gappy data...
+
+% introduce nans for plotting purposes
+Sal2 = [Sal2(1:end, 1:19) nan(3729,3) Sal2(1:end, 20:34)];
+Pres2 = [Pres2(1:end, 1:19) nan(3729,3) Pres2(1:end, 20:34)];
+Temp2 = [Temp2(1:end, 1:19) nan(3729,3) Temp2(1:end, 20:34)];
+dn2 = [dn2(1:19) datenum('01-Mar-2025 02:50:10') datenum('01-Mar-2025 03:30:10') datenum('01-Mar-2025 04:10:10') dn2(20:34)];
+
+
+SA2 = gsw_SA_from_SP(Sal2,Pres2,239,34);
+CT2 = gsw_CT_from_t(SA2,Temp2,Pres2);
+rho2 = gsw_rho(SA2,CT2,Pres2)-1000;
+rho2_sort = sort(rho2);
+N2_2_sort = smoothdata(smoothdata(9.8./nanmean(rho2_sort).*diffdiff(sort(rho2_sort),1)*2,'gaussian',32),2,'gaussian',5);
+
+%%
+z2 = repmat((0:0.25:932)',[1,length(dn2)]);
+%z2 = repmat((0:1:XXXXX)',[1,18]); % for the 1m version?
+
+dn2_matrix = repmat(dn2, [size(Temp2,1)], 1);
+x_ticks2 = [dn2(1,1)   dn2(1,8)   dn2(1,16)   dn2(1,24)    dn2(1,32) ];
+
+set(0, 'DefaultFigureColor', 'w');
+fig10 = figure(10);
+set_figure_LUCIA(fig10)
+clf
+subplot(1,2,1)
+pcolor(dn2_matrix(1,:),z2(:,1),Temp2); shading flat
+cmocean('thermal')
+%colormap(lansey)
+hold on
+%contour(dn2_matrix(1,:),z2(:,1),rho2,10,'Color','k')
+set(gca,'YDir','reverse')
+xmin = xlim(); % get current axis limits
+tick_interval = 1/6; % 1 day = 1 datenum unit
+tick_locs = xmin(1):tick_interval:xmin(2);
+xticks(tick_locs);
+datetick('x',15,'keepticks','keeplimits'); 
+
+% Add profile numbers (1–34) at the top
+hold on;
+y_top = max(z2(:,1)) - 0.05 * range(z2(:,1)); % place numbers slightly above top
+for ii = 1:length(dn2)-4
+    if ii > 19
+        text(dn2(ii+4), y_top, num2str(ii+3), ...
+        'HorizontalAlignment', 'center', ...
+        'VerticalAlignment', 'bottom', ...
+        'FontSize', 12, 'Color', 'k', 'Rotation', 90);
+    else
+        text(dn2(ii+1), y_top, num2str(ii+1), ...
+        'HorizontalAlignment', 'center', ...
+        'VerticalAlignment', 'bottom', ...
+        'FontSize', 12, 'Color', 'k', 'Rotation', 90);
+    end
+end
+c1 = colorbar;
+c1.Label.String = '[°C]';
+clim([2 14])
+title('Temperature')
+
+subplot(1,2,2)
+pcolor(dn2(1,:),z2(:,1),SA2); shading flat
+cmocean('haline')
+hold on
+%contour(dn2(1,:),z2(:,1),rho2,10,'Color','k')
+set(gca,'YDir','reverse')
+c1 = colorbar;
+c1.Label.String = '[g/kg]';
+clim([33 34.5])
+title('Salinity')
+xmin = xlim(); % get current axis limits
+tick_interval = 1/6; % 1 day = 1 datenum unit
+tick_locs = xmin(1):tick_interval:xmin(2);
+xticks(tick_locs);
+datetick('x',15,'keepticks','keeplimits'); 
+y_top = max(z2(:,1)) - 0.05 * range(z2(:,1)); % place numbers slightly above top
+for ii = 1:length(dn2)-4
+    if ii > 19
+        text(dn2(ii+4), y_top, num2str(ii+3), ...
+        'HorizontalAlignment', 'center', ...
+        'VerticalAlignment', 'bottom', ...
+        'FontSize', 12, 'Color', 'k', 'Rotation', 90);
+    else
+        text(dn2(ii+1), y_top, num2str(ii+1), ...
+        'HorizontalAlignment', 'center', ...
+        'VerticalAlignment', 'bottom', ...
+        'FontSize', 12, 'Color', 'k', 'Rotation', 90);
+    end
+end
+
 
 
 %% but for now just save designated values 
@@ -931,14 +1033,14 @@ ylabel(cb,'N2 [1/s2]','Rotation',270)
 
 %% add CTD to STAT1 struct 
 
-STAT1.ctd_time_coord = time_coord; STAT1.ctd_date_grid = date_grid; 
-STAT1.t = CT_grid; STAT1.s = SA_grid; 
-STAT1.ctd_p_grid = p_grid; 
+STAT2.ctd_time_coord = time_coord; STAT2.ctd_date_grid = date_grid; 
+STAT2.t = CT_grid; STAT2.s = SA_grid; 
+STAT2.ctd_p_grid = p_grid; 
 
-STAT1.interp_t = interp_t; STAT1.interp_s = interp_s; 
+STAT2.interp_t = interp_t; STAT2.interp_s = interp_s; 
 
-STAT1.n2_coord = n2_grid; 
-STAT1.interp_n2 = interp_n2;
+STAT2.n2_coord = n2_grid; 
+STAT2.interp_n2 = interp_n2;
 
 
 %% calculate richardson 

@@ -5,16 +5,12 @@ data_dir = '/home/vboatwright/OneDrive/Documents/SIO/projects/santalucia/data/pr
 out_dir = '/home/vboatwright/OneDrive/Documents/SIO/projects/santalucia/data/processed_ship/';
 
 station = 1; 
-
 ladcp_dir = [data_dir 'ladcp/station' num2str(station) '/']; 
-
 
 cast = 1; 
 file = sprintf('%02d.mat',cast);
 fn = [ladcp_dir file]; 
 S = load(fn); 
-
-
 
 % load variables
 u_cast = S.dr.u; 
@@ -220,11 +216,8 @@ end
 %% now plot 
 addpath /home/vboatwright/OneDrive/Documents/SIO/projects/santalucia/st_lucia_analysis
 
-
 cast_dim = repmat(casts,zlevels,1)'; 
 time_dim = repmat(ladcp_time,1,zlevels); 
-
-
 
 figure()
 subplot(3,2,1); hold on 
@@ -434,7 +427,7 @@ fig1=figure()
 subplot(3,2,1); hold on 
 [t,s] = title('Station 1','interpolated u velocity');
 pcolor(x',y',interp_u); 
-shading flat 
+shading interp 
 xlabel('Time'); ylabel('Depth [dbar]')
 set(gca, 'YDir', 'reverse')
 cmocean('balance'); cb = colorbar;
@@ -444,7 +437,7 @@ clim([-0.25 0.25])
 subplot(3,2,2); hold on 
 [t,s] = title('Station 1','interpolated v velocity');
 pcolor(x',y',interp_v); 
-shading flat 
+shading interp 
 xlabel('Time'); ylabel('Depth [dbar]')
 set(gca, 'YDir', 'reverse')
 cmocean('balance'); cb = colorbar;
@@ -455,7 +448,7 @@ clim([-0.25 0.25])
 subplot(3,2,3); hold on 
 subtitle('interpolated u shear')
 pcolor(xshear',yshear',interp_shear_u); 
-shading flat 
+shading interp 
 xlabel('Time'); ylabel('Depth [dbar]')
 set(gca, 'YDir', 'reverse')
 cmocean('balance'); cb = colorbar;
@@ -466,7 +459,7 @@ clim([-0.01 0.01])
 subplot(3,2,4); hold on 
 subtitle('interpolated v shear')
 pcolor(xshear',yshear',interp_shear_v); 
-shading flat 
+shading interp 
 xlabel('Time'); ylabel('Depth [dbar]')
 set(gca, 'YDir', 'reverse')
 cmocean('balance'); cb = colorbar;
@@ -476,7 +469,7 @@ clim([-0.01 0.01])
 subplot(3,2,5); hold on 
 subtitle('total shear')
 pcolor(xshear',yshear',tot_shear); 
-shading flat 
+shading interp 
 xlabel('Time'); ylabel('Depth [dbar]')
 set(gca, 'YDir', 'reverse')
 cmocean('balance'); cb = colorbar;
@@ -545,21 +538,44 @@ STAT1.shear_coord = shear_grid;
 STAT1.interp_shear_u = interp_shear_u; STAT1.interp_shear_v = interp_shear_v; 
 
 
-%% station 2 
+%% now use kerstin's code to correct temp and salinity from t1/s1  vs. t2/s2 
+
+% based on those plots this is a first best guess on which is "prettiest"
+goodT = [1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,1,1,1];
+goodS = [1,1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1];
+ 
+
+casts = 1:18; 
+
+% set up matrices for putting the data in
+Temp1 = nan(max(lengths),18);
+Sal1 = Temp1; Pres1 = Temp1;
+dn1 = nan(1,18);
+
+for ii = casts
+    load(filelist{ii});
+
+    if goodT(ii) == 1
+    T = datad.t1;
+    else
+    T = datad.t2;
+    end
+
+    if goodS(ii) == 1
+    S = datad.s1;
+    else
+    S = datad.s2;
+    end
+
+    Temp1(1:lengths(ii),ii) = fillmissing(T,'linear');
+    Sal1(1:lengths(ii),ii) = fillmissing(S,'linear');
+    Pres1(1:lengths(ii),ii) = fillmissing(datad.p,'linear');
+    dn1(ii) = nanmean(datad.datenum);
+   
+end
 
 
-LADCP2 = struct; 
-LADCP2.lon = lon; LADCP2.lat = lat; LADCP2.time = time; 
-LADCP2.u = u_all; LADCP2.v = v_all; LADCP2.p = p_all; 
-LADCP2.u_shearmethod = u_shearmethod; LADCP2.v_shearmethod = v_shearmethod; LADCP2.w_shearmethod = w_shearmethod; 
-LADCP2.tctd = t_ctd; LADCP2.sctd = s_ctd; 
-LADCP2.u_ctd = u_ctd; LADCP2.v_ctd = v_ctd; LADCP2.w_ctd = w_ctd; 
-LADCP2.ship_lon = ship_lon; LADCP2.ship_lat = ship_lat; 
-
-save([out_dir 'LADCP_station' num2str(station)],'LADCP2'); 
-
-
-%% now concatenate temp and salinity from .mat files 
+%% next, concatenate temp and salinity from .mat files 
 
 ctd_dir = [data_dir 'ctd_mat/station' num2str(station) '/']; 
 
@@ -603,12 +619,44 @@ date = datetime(S.datad.datenum,'ConvertFrom','datenum');
 time = S.datad.time; 
 
 %% initial plot 
+datadir = '/home/vboatwright/OneDrive/Documents/SIO/projects/santalucia/data/processed_ship/ctd_mat/station1/';
+files = dir(fullfile(datadir, 'SR2503_POstation_1_cast_*.mat'));
+filelist = fullfile({files.folder}, {files.name})';
 
-figure()
-plot(t1d,depth); hold on 
-plot(s1d,depth)
+
+% first a visual inspection
+for ii = 1:18
+    load(filelist{ii});
+
+    t1 = datad.t1;
+    t2 = datad.t2;
+    s1 = datad.s1;
+    s2 = datad.s2;
+
+    lengths(ii) = length(t1);
+
+    figure(ii)
+    clf
+    subplot(1,2,1)
+    plot([t1 t2],datad.depth)
+    legend('t1','t2'); axis ij
+    xlim([2 15])
+    subplot(1,2,2)
+    plot([s1 s2],datad.depth)
+    legend('s1','s2'); axis ij
+    xlim([30 36])
+    title(['Cast number: ' num2str(ii)])
+    
+end
+clear datad datau datad_1m datau_1m
 
 %% process and concatenate 
+
+addpath /home/vboatwright/OneDrive/Documents/SIO/projects/gsw_matlab
+addpath /home/vboatwright/OneDrive/Documents/SIO/projects/gsw_matlab/library
+addpath /home/vboatwright/OneDrive/Documents/SIO/projects/gsw_matlab/thermodynamics_from_t
+addpath /home/vboatwright/OneDrive/Documents/SIO/projects/santalucia/st_lucia_analysis
+
 
 % for station 1: 18 casts 
 if station == 1 
@@ -629,21 +677,21 @@ elseif station == 2
     zlevels = 3729; 
 end
 
-t1_all = nan(numcasts,zlevels); 
-s1_all = nan(numcasts,zlevels); 
-p_all = nan(numcasts,zlevels); 
+% separate out upcast and downcast - will decide per cast which sensor is best
+temp = nan(numcasts*2,zlevels); 
+sal = nan(numcasts*2,zlevels); 
+p = nan(numcasts*2,zlevels); 
+rho = nan(numcasts*2,zlevels); 
+n2 = nan(numcasts*2,zlevels); 
+timectd = nan(numcasts*2,zlevels);
 
-t1_down = nan(numcasts,zlevels); 
-s1_down = nan(numcasts,zlevels); 
+temp_down = nan(numcasts,zlevels); 
+sal_down = nan(numcasts,zlevels); 
 p_down = nan(numcasts,zlevels); 
+rho_down = nan(numcasts,zlevels); 
+n2_down = nan(numcasts,zlevels); 
 time_down = nan(numcasts,zlevels); 
 
-t2_all = nan(numcasts,zlevels); 
-s2_all = nan(numcasts,zlevels); 
-depth_all = nan(numcasts,zlevels); 
-
-
-% separate out upcast and downcast - will decide per cast which sensor is best
 t_grid = nan(numcasts*2,zlevels); 
 s_grid = nan(numcasts*2,zlevels); 
 p_grid = nan(numcasts*2,zlevels); 
@@ -654,6 +702,9 @@ lon_grid = nan(numcasts*2,zlevels);
 lat_grid = nan(numcasts*2,zlevels); 
 
 time_coord = nan(numcasts*2,1);
+
+goodT = [1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,1,1,1];
+goodS = [1,1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1];
 
 for cc = casts
    
@@ -669,82 +720,110 @@ for cc = casts
     fn = [ctd_dir file]; 
     S = load(fn); 
 
-    
     % load variables
     zlength = length(S.datad.t1); 
 
-    % down going 
-    t1_goingdo = S.datad.t1; 
-    s1_goingdo = S.datad.s1; 
-    t2_goingdo = S.datad.t2; 
-    s2_goingdo = S.datad.s2; 
+    % temp 
 
+    if goodT(ii) == 1
+        % down going 
+        t_goingdo = S.datad.t1; 
+        % up going 
+        t_goingup = S.datau.t1; 
+
+    else
+        % down going 
+        t_goingdo = S.datad.t2; 
+        % up going 
+        t_goingup = S.datau.t2; 
+    end
+
+    % salinity 
+
+    if goodS(ii) == 1
+        % down going 
+        s_goingdo = S.datad.s1; 
+        % up going 
+        s_goingup = S.datau.s1; 
+
+    else
+        % down going 
+        s_goingdo = S.datad.s2; 
+        % up going 
+        s_goingup = S.datau.s2; 
+    end
+
+
+    if cc == 10
+        sfilled = fillmissing(s_goingdo,'linear'); 
+        s_goingdo = sfilled; 
+        sfilled = fillmissing(s_goingup,'linear'); 
+        s_goingup = sfilled; 
+    end
+
+    if cc == 12
+        sfilled = fillmissing(s_goingdo,'linear'); 
+        s_goingdo = sfilled; 
+        sfilled = fillmissing(s_goingup,'linear'); 
+        s_goingup = sfilled;     
+    end
+
+
+    % other vars 
+    % down going 
     depth_down = S.datad.depth; 
     p_goingdo = S.datad.p; 
     date_goingdo = datetime(S.datad.datenum,'ConvertFrom','datenum'); 
     time_goingdo = S.datad.time; 
 
-    theta1cast = S.datad.theta1; 
-    sigma1cast = S.datad.sigma1; 
-    theta2cast = S.datad.theta2; 
-    sigma2cast = S.datad.sigma2; 
-    
     lon_goingdo = S.datad.lon; 
     lat_goingdo = S.datad.lat; 
     
-
-    % up going 
-    t1_goingup = S.datau.t1; 
-    s1_goingup = S.datau.s1; 
-    t2_goingup = S.datau.t2; 
-    s2_goingup = S.datau.s2; 
-
-    lon_goingup = S.datau.lon; 
-    lat_goingup = S.datau.lat; 
-
     array_sizes = cat(1,array_sizes,zlength); 
 
+    % other vars
+    % up going 
     depth_up = S.datau.depth; 
     p_goingup = S.datau.p; 
     date_goingup = datetime(S.datau.datenum,'ConvertFrom','datenum'); 
     time_goingup = S.datau.time; 
+    lon_goingup = S.datau.lon; 
+    lat_goingup = S.datau.lat; 
 
-    % other stuff
-    theta1cast = S.datad.theta1; 
-    sigma1cast = S.datad.sigma1; 
-    theta2cast = S.datad.theta2; 
-    sigma2cast = S.datad.sigma2; 
-    
+
+    % GSW to down 
+    sa_do = gsw_SA_from_SP(s_goingdo,p_goingdo,239,34);
+    ct_do = gsw_CT_from_t(sa_do,t_goingdo,p_goingdo);
+    rho_do = gsw_rho(sa_do,ct_do,p_goingdo)-1000;
+    rho_do_sort = sort(rho_do);
+    N2_do_sort = smoothdata(smoothdata(9.8./nanmean(rho_do_sort).*diffdiff(sort(rho_do_sort),1)*2,'gaussian',32),2,'gaussian',5);
+
+    % GSW to up 
+    sa_up = gsw_SA_from_SP(s_goingup,p_goingup,239,34);
+    ct_up = gsw_CT_from_t(sa_up,t_goingup,p_goingup);
+    rho_up = gsw_rho(sa_up,ct_up,p_goingup)-1000;
+    rho_up_sort = sort(rho_up);
+    N2_up_sort = smoothdata(smoothdata(9.8./nanmean(rho_up_sort).*diffdiff(sort(rho_up_sort),1)*2,'gaussian',32),2,'gaussian',5);
 
 
     % concatenate 
 
-    t1_down(cc,1:zlength) = t1_goingdo; 
-    s1_down(cc,1:zlength) = s1_goingdo; 
+    temp_down(cc,1:zlength) = ct_do; 
+    sal_down(cc,1:zlength) = sa_do; 
     p_down(cc,1:zlength) = p_goingdo; 
-    
-    t2_down(cc,1:zlength) = t2_goingdo; 
-    s2_down(cc,1:zlength) = s2_goingdo; 
-    depth_all(cc,1:zlength) = depth_down; 
-
-    %lons(cc,1:zlength) = loncast; 
-    %lats(cc,1:zlength) = latcast; 
-    %dates(cc,1:zlength) = datecast; 
-    %times(cc,1:zlength) = timecast;     
-
-
-    t1_down(cc,1:zlength) = t1_goingdo; 
-    s1_down(cc,1:zlength) = s1_goingdo; 
-    p_down(cc,1:zlength) = p_goingdo; 
+    rho_down(cc,1:zlength) = rho_do_sort; 
+    n2_down(cc,1:length(N2_do_sort)) = N2_do_sort;  
     time_down(cc) = mean(time_goingdo(find(~isnan(time_goingdo))));
 
-    
     % put it all together on the _grid files: 
 
+
     % downcasts
-    t_grid(1+(cc-1)*2,1:zlength) = t1_goingdo; 
-    s_grid(1+(cc-1)*2,1:zlength) = s1_goingdo; 
-    p_grid(1+(cc-1)*2,1:zlength) = p_goingdo;  
+    temp(1+(cc-1)*2,1:zlength) = ct_do; 
+    sal(1+(cc-1)*2,1:zlength) = sa_do; 
+    p(1+(cc-1)*2,1:zlength) = p_goingdo;  
+    rho(1+(cc-1)*2,1:zlength) = rho_do_sort;  
+    n2(1+(cc-1)*2,1:length(N2_do_sort)) = N2_do_sort;  
     date_grid(1+(cc-1)*2,1:zlength) = date_goingdo;     
     time_grid(1+(cc-1)*2,1:zlength) = time_goingdo;     
 
@@ -754,9 +833,11 @@ for cc = casts
     time_coord(1+(cc-1)*2) = mean([S.datad.time,S.datad.time],'all','omitnan');
 
     % upcasts
-    t_grid(cc*2,1:zlength) = t1_goingup; 
-    s_grid(cc*2,1:zlength) = s1_goingup; 
-    p_grid(cc*2,1:zlength) = p_goingup; 
+    temp(cc*2,1:zlength) = ct_up; 
+    sal(cc*2,1:zlength) = sa_up; 
+    p(cc*2,1:zlength) = p_goingup; 
+    rho(cc*2,1:zlength) = rho_up_sort; 
+    n2(cc*2,1:length(N2_up_sort)) = N2_up_sort; 
     date_grid(cc*2,1:zlength) = date_goingup;
     time_grid(cc*2,1:zlength) = time_goingup;     
 
@@ -767,24 +848,9 @@ for cc = casts
 
     % gridded?
     % time_updo(cc*2) = time_middle; 
-
-
     end
 
 end
-
-
-%% convert all of that with GSW toolbox: 
-addpath /home/vboatwright/OneDrive/Documents/SIO/projects/gsw_matlab
-addpath /home/vboatwright/OneDrive/Documents/SIO/projects/gsw_matlab/library
-addpath /home/vboatwright/OneDrive/Documents/SIO/projects/gsw_matlab/thermodynamics_from_t
-
-% first: change fields from practical salinity to absolute salinity 
-
-SA_grid = gsw_SA_from_SP(s_grid,p_grid,mean(ladcp_lon),mean(ladcp_lat)); 
-CT_grid = gsw_CT_from_t(SA_grid,t_grid,p_grid); 
-p_ref = 0; 
-rho_grid = gsw_rho(SA_grid,CT_grid,p_ref); 
 
 
 %% now plot 
@@ -792,7 +858,7 @@ rho_grid = gsw_rho(SA_grid,CT_grid,p_ref);
 figure()
 subplot(3,1,1); hold on 
 title('cons temp')
-pcolor(date_grid,p_grid,CT_grid); 
+pcolor(date_grid,p,temp); 
 shading flat 
 xlabel('Time'); ylabel('Depth [dbar]')
 xtickformat('dd HH:mm')
@@ -804,7 +870,7 @@ ylabel(cb,'[deg C]','Rotation',270)
 
 subplot(3,1,2); hold on 
 title('sal')
-pcolor(date_grid,p_grid,SA_grid); 
+pcolor(date_grid,p,sal); 
 shading flat 
 xlabel('Date'); ylabel('Depth [dbar]')
 xtickformat('MM-dd HH:mm')
@@ -816,7 +882,7 @@ ylabel(cb,'[psu]','Rotation',270)
 
 subplot(3,1,3); hold on 
 title('rho')
-pcolor(date_grid,p_grid,rho_grid); 
+pcolor(date_grid,p,rho); 
 shading flat 
 xlabel('Date'); ylabel('Depth [dbar]')
 xtickformat('MM-dd HH:mm')
@@ -855,14 +921,14 @@ for cc = 1:nc
     % coarsening method 
     for ii = 1:interp_nz
         depth_on_grid = interp_grid(ii);
-        [~,depth_index] = min(abs(p_grid(1,:)-depth_on_grid));
-        [~,shallowidx] = min(abs(p_grid(1,:)-(depth_on_grid-10)));
-        [~,deepidx] = min(abs(p_grid(1,:)-(depth_on_grid+10)));
+        [~,depth_index] = min(abs(p(1,:)-depth_on_grid));
+        [~,shallowidx] = min(abs(p(1,:)-(depth_on_grid-10)));
+        [~,deepidx] = min(abs(p(1,:)-(depth_on_grid+10)));
 
         % we are at the surface - only use top 2 in the mean 
-        interp_t(cc,ii) = mean(CT_grid(cc,shallowidx:deepidx),'omitnan');
-        interp_s(cc,ii) = mean(SA_grid(cc,shallowidx:deepidx),'omitnan');
-        interp_rho(cc,ii) = mean(rho_grid(cc,shallowidx:deepidx),'omitnan');
+        interp_t(cc,ii) = mean(temp(cc,shallowidx:deepidx),'omitnan');
+        interp_s(cc,ii) = mean(sal(cc,shallowidx:deepidx),'omitnan');
+        interp_rho(cc,ii) = mean(rho(cc,shallowidx:deepidx),'omitnan');
 
     end
 
@@ -885,7 +951,7 @@ fig1=figure()
 subplot(2,2,1); hold on 
 [t,s] = title('Station 1','interpolated conservative temp');
 pcolor(X',Y',interp_t); 
-shading flat 
+shading interp 
 xlabel('Time'); ylabel('Depth [dbar]')
 set(gca, 'YDir', 'reverse')
 cmocean('thermal'); cb = colorbar;
@@ -894,7 +960,7 @@ ylabel(cb,'temp [degC]','Rotation',270)
 subplot(2,2,2); hold on 
 [t,s] = title('Station 1','interpolated absolute salinity');
 pcolor(X',Y',interp_s); 
-shading flat 
+shading interp 
 xlabel('Time'); ylabel('Depth [dbar]')
 set(gca, 'YDir', 'reverse')
 cmocean('haline'); cb = colorbar;
@@ -904,7 +970,7 @@ ylabel(cb,'salinity','Rotation',270)
 subplot(2,2,3); hold on 
 subtitle('interpolated density')
 pcolor(X',Y',interp_rho); 
-shading flat 
+shading interp 
 xlabel('Time'); ylabel('Depth [dbar]')
 set(gca, 'YDir', 'reverse')
 cmocean('dense'); cb = colorbar;
@@ -914,7 +980,7 @@ ylabel(cb,'rho [kg/m3]','Rotation',270)
 subplot(2,2,4); hold on 
 subtitle('interpolated n2')
 pcolor(XN2',YN2',interp_n2); 
-shading flat 
+shading interp 
 xlabel('Time'); ylabel('Depth [dbar]')
 set(gca, 'YDir', 'reverse')
 cmocean('matter'); cb = colorbar;
@@ -932,9 +998,21 @@ ylabel(cb,'N2 [1/s2]','Rotation',270)
 %% add CTD to STAT1 struct 
 
 STAT1.ctd_time_coord = time_coord; STAT1.ctd_date_grid = date_grid; 
-STAT1.t = CT_grid; STAT1.s = SA_grid; 
-STAT1.ctd_p_grid = p_grid; 
+STAT1.t = temp; STAT1.s = sal; 
+STAT1.ctd_p = p; 
 
+STAT1.ctd_time_do = time_down; STAT1.n2_down = date_grid; 
+STAT1.t_do = temp; STAT1.s_do = sal; 
+STAT1.ctd_p_do = p; 
+
+   temp_down(cc,1:zlength) = ct_do; 
+    sal_down(cc,1:zlength) = sa_do; 
+    p_down(cc,1:zlength) = p_goingdo; 
+    rho_down(cc,1:zlength) = rho_do_sort; 
+    n2_down(cc,1:length(N2_do_sort)) = N2_do_sort;  
+    time_down(cc) = mean(time_goingdo(find(~isnan(time_goingdo))));
+
+  
 STAT1.interp_t = interp_t; STAT1.interp_s = interp_s; 
 
 STAT1.n2_coord = n2_grid; 

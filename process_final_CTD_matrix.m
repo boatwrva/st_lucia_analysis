@@ -1,0 +1,432 @@
+
+% this code is supposed to help figure out the bestest, prettiest, combo of
+% t1 and t2, s1 and s2 sensors 
+
+% make sure you have loaded the gsw file locations 
+addpath /home/vboatwright/OneDrive/Documents/SIO/projects/gsw_matlab
+addpath /home/vboatwright/OneDrive/Documents/SIO/projects/gsw_matlab/library
+addpath /home/vboatwright/OneDrive/Documents/SIO/projects/gsw_matlab/thermodynamics_from_t
+
+
+% LET'S START WITH STATION 1 - the most offshore one
+
+% first read in all the files
+datadir = '/home/vboatwright/OneDrive/Documents/SIO/projects/santalucia/data/processed_ship/ctd_mat/station1/';
+files = dir(fullfile(datadir, 'SR2503_POstation_1_cast_*.mat'));
+filelist = fullfile({files.folder}, {files.name})';
+
+
+% first a visual inspection
+for ii = 1:18
+    load(filelist{ii});
+
+    t1 = datad.t1;
+    t2 = datad.t2;
+    s1 = datad.s1;
+    s2 = datad.s2;
+
+    lengths(ii) = length(t1);
+
+    figure(ii)
+    clf
+    subplot(1,2,1)
+    plot([t1 t2],datad.depth)
+    legend('t1','t2'); axis ij
+    xlim([2 15])
+    subplot(1,2,2)
+    plot([s1 s2],datad.depth)
+    legend('s1','s2'); axis ij
+    xlim([30 36])
+    title(['Cast number: ' num2str(ii)])
+    
+end
+clear datad datau datad_1m datau_1m
+
+%%
+% based on those plots this is a first best guess on which is "prettiest"
+goodT = [1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,1,1,1];
+goodS = [1,1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1];
+
+% set up matrices for putting the data in
+Temp1 = nan(max(lengths),18);
+Sal1 = Temp1; Pres1 = Temp1;
+dn1 = nan(1,18);
+
+for ii = 1:18
+    load(filelist{ii});
+
+    if goodT(ii) == 1
+    T = datad.t1;
+    else
+    T = datad.t2;
+    end
+
+    if goodS(ii) == 1
+    S = datad.s1;
+    else
+    S = datad.s2;
+    end
+
+    Temp1(1:lengths(ii),ii) = fillmissing(T,'linear');
+    Sal1(1:lengths(ii),ii) = fillmissing(S,'linear');
+    Pres1(1:lengths(ii),ii) = fillmissing(datad.p,'linear');
+    dn1(ii) = nanmean(datad.datenum);
+   
+end
+
+
+%%
+% cast 10 and 12 are a little ratty looking for the salinity so let's
+% smooth that over a little bit:
+
+% hampel filter to remove outliers
+s10 = hampel(Sal1(:,10));
+s12 = hampel(Sal1(:,12));
+
+% smooth things over
+s10 = movmean(s10,30);
+s12 = movmean(s12,20);
+
+% plot to see what that looks like
+fig10 = figure(10);
+clf
+set_figure_LUCIA(fig10)
+subplot(121)
+plot([Sal1(:,10) s10 ], (0:0.25:2230)')
+legend('Raw sensor 2', 'Smoothed')
+axis ij
+title('Cast 10')
+
+subplot(122)
+plot([Sal1(:,12) s12 ], (0:0.25:2230)')
+legend('Raw sensor 2', 'Smoothed')
+axis ij
+title('Cast 12')
+
+% Add that to the matrix for plotting below
+% do the upper ~500m only since they looked worst
+Sal1(1:2400,10) = s10(1:2400);
+Sal1(1:2400,12) = s12(1:2400);
+
+%% Ok take two on fixing cast 10 and 12
+% the simple smoothing didn't really do enough so let's be drastic and
+% interpolate over them. Rerun the loading in of the files again.
+
+Sal1(1:end,10) = nan;
+Sal1(1:end,12) = nan;
+
+for ii = 1:size(Sal1,1)
+
+    Sal1(ii,:) = fillmissing(Sal1(ii,:),'linear');
+
+end
+
+% this does seem to make things better...
+
+%%
+clear datad datau datad_1m datau_1m
+
+SA1 = gsw_SA_from_SP(Sal1,Pres1,239,34);
+CT1 = gsw_CT_from_t(SA1,Temp1,Pres1);
+rho1 = gsw_rho(SA1,CT1,Pres1)-1000;
+rho1_sort = sort(rho1);
+N2_1_sort = smoothdata(smoothdata(9.8./nanmean(rho1_sort).*diffdiff(sort(rho1_sort),1)*2,'gaussian',32),2,'gaussian',5);
+
+
+
+z1 = repmat((0:0.25:2230)',[1,18]);
+%z1 = repmat((0:1:2230)',[1,18]); % for the 1m version
+dn1_matrix = repmat(dn1, [size(Temp1,1)], 1);
+
+x_ticks1 = [dn1(1,1)   dn1(1,4)   dn1(1,8)   dn1(1,14)    dn1(1,18) ];
+
+set(0, 'DefaultFigureColor', 'w');
+fig1 = figure(1);
+set_figure_LUCIA(fig1)
+clf
+subplot(1,2,1)
+%pcolor(dn1(1,:),z1(:,1),Temp1); shading flat
+contourf(dn1(1,:),z1(:,1),Temp1,50,'LineStyle','none')
+cmocean('thermal') 
+%colormap(lansey)
+hold on
+contour(dn1(1,:),z1(:,1),rho1,20,'Color','k')
+set(gca,'YDir','reverse')
+c1 = colorbar;
+c1.Label.String = '[°C]';
+clim([2 14])
+title('Temperature')
+xmin = xlim(); % get current axis limits
+tick_interval = 1/6; % 1 day = 1 datenum unit
+tick_locs = xmin(1):tick_interval:xmin(2);
+xticks(tick_locs);
+datetick('x',15,'keepticks','keeplimits'); 
+
+% Add profile numbers (1–18) at the top
+hold on;
+y_top = max(z1(:,1)) - 0.05 * range(z1(:,1)); % place numbers slightly above top
+for ii = 1:length(dn1)
+
+        text(dn1(ii), y_top, num2str(ii), ...
+        'HorizontalAlignment', 'center', ...
+        'VerticalAlignment', 'bottom', ...
+        'FontSize', 12, 'Color', 'k', 'Rotation', 90);
+  
+end
+
+
+subplot(1,2,2)
+% pcolor(dn1(1,:),z1(:,1),SA1); shading flat
+contourf(dn1(1,:),z1(:,1),SA1,50,'LineStyle','none')
+cmocean('haline')
+hold on
+contour(dn1(1,:),z1(:,1),rho1,20,'Color','k')
+set(gca,'YDir','reverse')
+c1 = colorbar;
+c1.Label.String = '[g/kg]';
+clim([33 34.5])
+title('Salinity')
+xmin = xlim(); % get current axis limits
+tick_interval = 1/6; % 1 day = 1 datenum unit
+tick_locs = xmin(1):tick_interval:xmin(2);
+xticks(tick_locs);
+datetick('x',15,'keepticks','keeplimits'); 
+
+% Add profile numbers (1–18) at the top
+hold on;
+y_top = max(z1(:,1)) - 0.05 * range(z1(:,1)); % place numbers slightly above top
+for ii = 1:length(dn1)
+
+        text(dn1(ii), y_top, num2str(ii), ...
+        'HorizontalAlignment', 'center', ...
+        'VerticalAlignment', 'bottom', ...
+        'FontSize', 12, 'Color', 'k', 'Rotation', 90);
+  
+end
+
+%% Just a quick look at thorpe scales from this too...
+
+addpath(genpath('/Users/kerstin/Documents/MATLAB/Standard-Mixing-Routines-master/'))
+
+%[Epsout,Lmin,Lot,runlmax,Lttot]=compute_overturns(p,t,s,varargin)
+
+%        compute_overturns2(p,t,s,'lat',lat,'usetemp',usetemp,'minotsize',minotsize,'sigma',sigma,'runlmin',runlmin)
+
+%compute_overturns.m
+%
+% calculate overturns from a variety of instruments
+% p,t,s are vectors of pressure, temperature and salinity typically from downcast only
+% usetemp set to 1 to use temperature to compute overturns, otherwise uses density
+% minotsize is the minimum overturn size to consider (too small and may be noise)
+% sigma is noise level for density.
+% runlmin is run length minimum.
+
+% INPUTS:
+%   p - pressure vector
+%   t - temperature vector
+%   s - salinity vector
+%   lat - latitude of measurement (needed for BVFREQ calculation)
+%   usetemp - variable (either set to 1 if temperature is to be used to compute overturns (default 0))
+%   minotsize - minimum overturn size to consider (default 2)
+%   sigma - noise level for density (default 5e-4)
+%   runlmin - minimum run length (default 0)
+%
+%
+% OUTPUTS:
+%   Epsout - epsilon (dissipation rate) calculated by: e = 0.64*Lt^2*N^3
+%   Lmin - smallest observable thorpe scale = 2*9.8/N2 *sigma/1027 where N2
+%               is the profile averaged N2
+%   Lot - maximum possible overturn observed (depth of sampled column of water)
+%   runlmax - maximum number of runs
+%   Lttot - rms thorpe overturns
+%
+% same as compute_overturns.m but input is salinity instead of conductivity
+% becuase sometimes salinity has been separately despiked already
+ 
+
+for ii = 1:18
+
+    [Epsout,Lmin,Lot,runlmax,Lttot] = compute_overturns(Pres1(:,ii),Temp1(:,ii),SA1(:,ii),35);
+
+    Eps1(:,ii) = Epsout;
+    L_min1(:,ii) = Lmin;
+    L_ot1(:,ii) = Lot;
+    %run_lmax(:,ii) = runlmax';
+    Lt_tot1(:,ii) = Lttot;
+
+end
+
+%
+
+set(0, 'DefaultFigureColor', 'w');
+fig2 = figure(2);
+set_figure_LUCIA(fig2)
+clf
+pcolor([1:1:18],z1,(Eps1)); shading flat
+cmocean('algae')
+set(gca,'YDir','reverse')
+c1 = colorbar;
+c1.Label.String = '\epsilon [m^2/s^3]'; ylabel('[m]')
+clim([10^(-12) 10^(-7)])
+
+
+
+
+%%   SAME THING FOR STATION 2 -  the onshore one
+
+% first read in all the files
+files = dir(fullfile('/Volumes/KerstinB/SR2503_scienceparty_share/CTD/', 'SR2503_POstation_2_cast_*.mat'));
+filelist = fullfile({files.folder}, {files.name})';
+
+
+% first a visual inspection
+for ii = 1:34
+    load(filelist{ii});
+
+    t1 = datad.t1;
+    t2 = datad.t2;
+    s1 = datad.s1;
+    s2 = datad.s2;
+
+    lengths(ii) = length(t1);
+
+%     figure(ii)
+%     clf
+%     subplot(1,2,1)
+%     plot([t1 t2],datad.depth)
+%     legend('t1','t2'); axis ij
+%     xlim([2 15])
+%     subplot(1,2,2)
+%     plot([s1 s2],datad.depth)
+%     legend('s1','s2'); axis ij
+%     xlim([30 36])
+%     title(['Cast number: ' num2str(ii)])
+    
+end
+clear datad datau datad_1m datau_1m
+
+
+%% 
+
+% based on those plots this is a first best guess on which is "prettiest"
+goodT = [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1];
+goodS = [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1];
+
+% set up matrices for putting the data in, 34 casts
+Temp2 = nan(max(lengths),34);
+Sal2 = Temp2; Pres2 = Temp2;
+dn2 = nan(1,34);
+
+for ii = 1:34
+    load(filelist{ii});
+
+    if goodT(ii) == 1
+    T = datad.t1;
+    else
+    T = datad.t2;
+    end
+
+    if goodS(ii) == 1
+    S = datad.s1;
+    else
+    S = datad.s2;
+    end
+
+    Temp2(1:lengths(ii),ii) = fillmissing(T,'linear');
+    Sal2(1:lengths(ii),ii) = fillmissing(S,'linear');
+    Pres2(1:lengths(ii),ii) = fillmissing(datad.p,'linear');
+    dn2(ii) = nanmean(datad.datenum);
+   
+end
+
+clear datad datau datad_1m datau_1m
+
+%% plotting time, let's do this against time since this is the gappy data...
+
+% introduce nans for plotting purposes
+Sal2 = [Sal2(1:end, 1:19) nan(3729,3) Sal2(1:end, 20:34)];
+Pres2 = [Pres2(1:end, 1:19) nan(3729,3) Pres2(1:end, 20:34)];
+Temp2 = [Temp2(1:end, 1:19) nan(3729,3) Temp2(1:end, 20:34)];
+dn2 = [dn2(1:19) datenum('01-Mar-2025 02:50:10') datenum('01-Mar-2025 03:30:10') datenum('01-Mar-2025 04:10:10') dn2(20:34)];
+
+
+SA2 = gsw_SA_from_SP(Sal2,Pres2,239,34);
+CT2 = gsw_CT_from_t(SA2,Temp2,Pres2);
+rho2 = gsw_rho(SA2,CT2,Pres2)-1000;
+rho2_sort = sort(rho2);
+N2_2_sort = smoothdata(smoothdata(9.8./nanmean(rho2_sort).*diffdiff(sort(rho2_sort),1)*2,'gaussian',32),2,'gaussian',5);
+
+%%
+z2 = repmat((0:0.25:932)',[1,length(dn2)]);
+%z2 = repmat((0:1:XXXXX)',[1,18]); % for the 1m version?
+
+dn2_matrix = repmat(dn2, [size(Temp2,1)], 1);
+x_ticks2 = [dn2(1,1)   dn2(1,8)   dn2(1,16)   dn2(1,24)    dn2(1,32) ];
+
+set(0, 'DefaultFigureColor', 'w');
+fig10 = figure(10);
+set_figure_LUCIA(fig10)
+clf
+subplot(1,2,1)
+pcolor(dn2_matrix(1,:),z2(:,1),Temp2); shading flat
+cmocean('thermal')
+%colormap(lansey)
+hold on
+contour(dn2_matrix(1,:),z2(:,1),rho2,10,'Color','k')
+set(gca,'YDir','reverse')
+xmin = xlim(); % get current axis limits
+tick_interval = 1/6; % 1 day = 1 datenum unit
+tick_locs = xmin(1):tick_interval:xmin(2);
+xticks(tick_locs);
+datetick('x',15,'keepticks','keeplimits'); 
+
+% Add profile numbers (1–34) at the top
+hold on;
+y_top = max(z2(:,1)) - 0.05 * range(z2(:,1)); % place numbers slightly above top
+for ii = 1:length(dn2)-4
+    if ii > 19
+        text(dn2(ii+4), y_top, num2str(ii+3), ...
+        'HorizontalAlignment', 'center', ...
+        'VerticalAlignment', 'bottom', ...
+        'FontSize', 12, 'Color', 'k', 'Rotation', 90);
+    else
+        text(dn2(ii+1), y_top, num2str(ii+1), ...
+        'HorizontalAlignment', 'center', ...
+        'VerticalAlignment', 'bottom', ...
+        'FontSize', 12, 'Color', 'k', 'Rotation', 90);
+    end
+end
+c1 = colorbar;
+c1.Label.String = '[°C]';
+clim([2 14])
+title('Temperature')
+
+subplot(1,2,2)
+pcolor(dn2(1,:),z2(:,1),SA2); shading flat
+cmocean('haline')
+hold on
+contour(dn2(1,:),z2(:,1),rho2,10,'Color','k')
+set(gca,'YDir','reverse')
+c1 = colorbar;
+c1.Label.String = '[g/kg]';
+clim([33 34.5])
+title('Salinity')
+xmin = xlim(); % get current axis limits
+tick_interval = 1/6; % 1 day = 1 datenum unit
+tick_locs = xmin(1):tick_interval:xmin(2);
+xticks(tick_locs);
+datetick('x',15,'keepticks','keeplimits'); 
+y_top = max(z2(:,1)) - 0.05 * range(z2(:,1)); % place numbers slightly above top
+for ii = 1:length(dn2)-4
+    if ii > 19
+        text(dn2(ii+4), y_top, num2str(ii+3), ...
+        'HorizontalAlignment', 'center', ...
+        'VerticalAlignment', 'bottom', ...
+        'FontSize', 12, 'Color', 'k', 'Rotation', 90);
+    else
+        text(dn2(ii+1), y_top, num2str(ii+1), ...
+        'HorizontalAlignment', 'center', ...
+        'VerticalAlignment', 'bottom', ...
+        'FontSize', 12, 'Color', 'k', 'Rotation', 90);
+    end
+end
